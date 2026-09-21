@@ -68,14 +68,29 @@ class MainWindow(QMainWindow):
 
         self.reset_view_button.clicked.connect(self.reset_view)
 
-        self.axis_panel.select_point.connect(self.graph_view.start_axis_selection)
+        self.axis_panel.select_point.connect(self.select_axis_point)
 
         self.axis_panel.reset.connect(self.reset_axis_selection)
 
         self.graph_view.clicked.connect(self.on_graph_clicked)
 
+    def select_axis_point(self, name):
+        # Atualiza visualmente o painel
+        self.axis_panel.set_current_selection(name)
+
+        # Diz ao GraphView qual será o próximo clique
+        self.graph_view.start_axis_selection(name)
+
+        # Atualiza o índice da sequência para continuar
+        # depois deste ponto
+        self.selection_index = (
+            self.selection_sequence.index(name)
+        )
+
     def on_graph_clicked(self, x, y):
-        if self.selection_index >= len(self.selection_sequence):
+        if self.selection_index >= len(
+            self.selection_sequence
+        ):
             return
 
         current_point = self.selection_sequence[self.selection_index]
@@ -85,7 +100,6 @@ class MainWindow(QMainWindow):
             f"x={x:.2f}, y={y:.2f}"
         )
 
-        # Avança para o próximo ponto
         self.selection_index += 1
 
         if self.selection_index >= len(self.selection_sequence):
