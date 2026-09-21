@@ -4,14 +4,14 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
-    QLabel,
+    QHBoxLayout,
     QMainWindow,
     QPushButton,
     QToolBar,
-    QVBoxLayout,
     QWidget,
 )
 
+from axis_panel import AxisPanel
 from graph_view import GraphView
 
 
@@ -23,34 +23,40 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Datasheet Picker")
         self.resize(1400, 900)
 
-        self._create_central_widget()
-        self._create_toolbar()
+        self._create_ui()
         self._connect_signals()
 
-    def _create_central_widget(self):
-        central_widget = QWidget()
-        layout = QVBoxLayout(central_widget)
+    def _create_ui(self):
+        central = QWidget()
+        layout = QHBoxLayout(central)
 
+        self.axis_panel = AxisPanel()
         self.graph_view = GraphView()
 
-        self.status_label = QLabel(
-            "Open an image to begin."
-        )
+        self.axis_panel.setMinimumWidth(260)
+        self.axis_panel.setMaximumWidth(320)
 
+        layout.addWidget(self.axis_panel)
         layout.addWidget(self.graph_view)
-        layout.addWidget(self.status_label)
 
-        self.setCentralWidget(central_widget)
+        self.setCentralWidget(central)
 
-    def _create_toolbar(self):
+        # Toolbar
         toolbar = QToolBar("Main Toolbar")
         toolbar.setMovable(False)
 
-        self.open_button = QPushButton("Open Image")
-        self.reset_button = QPushButton("Reset View")
+        self.open_button = QPushButton(
+            "Open Image"
+        )
+
+        self.reset_view_button = QPushButton(
+            "Reset View"
+        )
 
         toolbar.addWidget(self.open_button)
-        toolbar.addWidget(self.reset_button)
+        toolbar.addWidget(
+            self.reset_view_button
+        )
 
         self.addToolBar(
             Qt.ToolBarArea.TopToolBarArea,
@@ -62,12 +68,16 @@ class MainWindow(QMainWindow):
             self.open_image
         )
 
-        self.reset_button.clicked.connect(
+        self.reset_view_button.clicked.connect(
             self.reset_view
         )
 
-        self.graph_view.clicked.connect(
-            self.on_graph_clicked
+        self.axis_panel.select_point.connect(
+            self.graph_view.start_axis_selection
+        )
+
+        self.axis_panel.reset.connect(
+            self.graph_view.reset_axis_selection
         )
 
     def open_image(self):
@@ -83,18 +93,9 @@ class MainWindow(QMainWindow):
         if not filename:
             return
 
-        success = self.graph_view.load_image(
+        self.graph_view.load_image(
             filename
         )
-
-        if success:
-            self.status_label.setText(
-                f"Loaded: {filename}"
-            )
-        else:
-            self.status_label.setText(
-                "Failed to load image."
-            )
 
     def reset_view(self):
         if self.graph_view.image_item is None:
@@ -103,16 +104,6 @@ class MainWindow(QMainWindow):
         self.graph_view.fitInView(
             self.graph_view.image_item,
             Qt.AspectRatioMode.KeepAspectRatio,
-        )
-
-        self.status_label.setText(
-            "View reset."
-        )
-
-    def on_graph_clicked(self, x, y):
-        self.status_label.setText(
-            f"Pixel coordinates: "
-            f"x = {x:.1f}, y = {y:.1f}"
         )
 
 if __name__ == "__main__":

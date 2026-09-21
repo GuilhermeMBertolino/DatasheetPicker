@@ -2,11 +2,12 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QBrush, QPen, QPixmap
 from PySide6.QtWidgets import (
     QGraphicsEllipseItem,
+    QGraphicsLineItem,
+    QGraphicsItemGroup,
     QGraphicsPixmapItem,
     QGraphicsScene,
     QGraphicsView,
 )
-
 
 class GraphView(QGraphicsView):
     clicked = Signal(float, float)
@@ -19,10 +20,13 @@ class GraphView(QGraphicsView):
 
         self.image_item = None
 
-        # Pan com botão esquerdo arrastando
-        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        self.selection_mode = None
+        self.axis_markers = {}
 
-        # Zoom acontece em torno do mouse
+        self.setDragMode(
+            QGraphicsView.DragMode.ScrollHandDrag
+        )
+
         self.setTransformationAnchor(
             QGraphicsView.ViewportAnchor.AnchorUnderMouse
         )
@@ -37,11 +41,12 @@ class GraphView(QGraphicsView):
         if pixmap.isNull():
             return False
 
-        # Limpa a cena anterior
         self.scene.clear()
 
         self.image_item = QGraphicsPixmapItem(pixmap)
         self.scene.addItem(self.image_item)
+
+        self.axis_markers.clear()
 
         self.scene.setSceneRect(
             self.image_item.boundingRect()
@@ -58,7 +63,10 @@ class GraphView(QGraphicsView):
         zoom_factor = 1.15
 
         if event.angleDelta().y() > 0:
-            self.scale(zoom_factor, zoom_factor)
+            self.scale(
+                zoom_factor,
+                zoom_factor,
+            )
         else:
             self.scale(
                 1 / zoom_factor,
@@ -66,23 +74,19 @@ class GraphView(QGraphicsView):
             )
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-
+        if (
+            event.button() == Qt.MouseButton.LeftButton
+            and self.selection_mode is not None
+        ):
             scene_pos = self.mapToScene(
                 event.position().toPoint()
             )
 
-            # Só registra cliques dentro da imagem
-            if (
-                self.image_item is not None
-                and self.image_item.contains(
-                    self.image_item.mapFromScene(scene_pos)
-                )
-            ):
-                print(
-                    f"Clicked: "
-                    f"x={scene_pos.x():.2f}, "
-                    f"y={scene_pos.y():.2f}"
+            if self._inside_image(scene_pos):
+                self.set_axis_marker(
+                    self.selection_mode,
+                    scene_pos.x(),
+                    scene_pos.y(),
                 )
 
                 self.clicked.emit(
@@ -90,14 +94,84 @@ class GraphView(QGraphicsView):
                     scene_pos.y(),
                 )
 
-                self.add_marker(
-                    scene_pos.x(),
-                    scene_pos.y(),
-                )
+                self.selection_mode = None
+
+                return
 
         super().mousePressEvent(event)
 
-    def add_marker(self, x, y, radius=5):
+    def start_axis_selection(self, name):
+        self.selection_mode = name
+
+    def set_axis_marker(self, name, x, y):
+        # Remove previous marker
+        if name in self.axis_markers:
+            self.scene.removeItem(
+                self.axis_markers[name]
+            )
+
+        if name in ("X1", "X2"):
+            color = Qt.GlobalColor.red
+        else:
+            color = Qt.GlobalColor.blue
+
+        if name in ("X1", "Y1"):
+            marker = self._create_cross(
+                x,
+                y,
+                color,
+            )
+        else:
+            marker = self._create_circle(
+                x,
+                y,
+                color,
+            )
+
+        self.scene.addItem(marker)
+
+        marker.setZValue(10)
+
+        self.axis_markers[name] = marker
+
+    def reset_axis_selection(self):
+        for marker in self.axis_markers.values():
+            self.scene.removeItem(marker)
+
+        self.axis_markers.clear()
+        self.selection_mode = None
+
+    def _create_cross(self, x, y, color, size=2):
+        pen = QPen(color)
+        pen.setWidth(1)
+
+        line1 = QGraphicsLineItem(
+            x - size,
+            y - size,
+            x + size,
+            y + size,
+        )
+
+        line2 = QGraphicsLineItem(
+            x - size,
+            y + size,
+            x + size,
+            y - size,
+        )
+
+        line1.setPen(pen)
+        line2.setPen(pen)
+
+        group = QGraphicsItemGroup()
+
+        group.addToGroup(line1)
+        group.addToGroup(line2)
+
+        group.setZValue(10)
+
+        return group
+
+    def _create_circle(self, x, y, color, radius=2):
         marker = QGraphicsEllipseItem(
             x - radius,
             y - radius,
@@ -105,16 +179,23 @@ class GraphView(QGraphicsView):
             2 * radius,
         )
 
-        marker.setBrush(
-            QBrush(Qt.GlobalColor.red)
-        )
+        pen = QPen(color)
+        pen.setWidth(2)
 
-        marker.setPen(
-            QPen(Qt.GlobalColor.red)
-        )
+        marker.setPen(pen)
 
-        marker.setZValue(10)
-
-        self.scene.addItem(marker)
+        marker.setBrush(QBrush(color))
 
         return marker
+
+    def _inside_image(self, scene_pos):
+        if self.image_item is None:
+            return False
+
+        local_pos = self.image_item.mapFromScene(
+            scene_pos
+        )
+
+        return self.image_item.contains(
+            local_pos
+        )
