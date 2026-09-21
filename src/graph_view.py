@@ -100,8 +100,6 @@ class GraphView(QGraphicsView):
                     scene_pos.y(),
                 )
 
-                self.selection_mode = None
-
                 return
 
         super().mousePressEvent(event)

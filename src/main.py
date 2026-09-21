@@ -16,15 +16,22 @@ from graph_view import GraphView
 
 
 class MainWindow(QMainWindow):
-
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("Datasheet Picker")
         self.resize(1400, 900)
 
+        self.selection_sequence = ["X1", "X2", "Y1", "Y2"]
+
+        self.selection_index = 0
+
         self._create_ui()
         self._connect_signals()
+
+        # Start calibration at X1
+        self.axis_panel.set_current_selection("X1")
+        self.graph_view.start_axis_selection("X1")
 
     def _create_ui(self):
         central = QWidget()
@@ -41,22 +48,15 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(central)
 
-        # Toolbar
         toolbar = QToolBar("Main Toolbar")
         toolbar.setMovable(False)
 
-        self.open_button = QPushButton(
-            "Open Image"
-        )
+        self.open_button = QPushButton("Open Image")
 
-        self.reset_view_button = QPushButton(
-            "Reset View"
-        )
+        self.reset_view_button = QPushButton("Reset View")
 
         toolbar.addWidget(self.open_button)
-        toolbar.addWidget(
-            self.reset_view_button
-        )
+        toolbar.addWidget(self.reset_view_button)
 
         self.addToolBar(
             Qt.ToolBarArea.TopToolBarArea,
@@ -64,21 +64,48 @@ class MainWindow(QMainWindow):
         )
 
     def _connect_signals(self):
-        self.open_button.clicked.connect(
-            self.open_image
+        self.open_button.clicked.connect(self.open_image)
+
+        self.reset_view_button.clicked.connect(self.reset_view)
+
+        self.axis_panel.select_point.connect(self.graph_view.start_axis_selection)
+
+        self.axis_panel.reset.connect(self.reset_axis_selection)
+
+        self.graph_view.clicked.connect(self.on_graph_clicked)
+
+    def on_graph_clicked(self, x, y):
+        if self.selection_index >= len(self.selection_sequence):
+            return
+
+        current_point = self.selection_sequence[self.selection_index]
+
+        print(
+            f"{current_point}: "
+            f"x={x:.2f}, y={y:.2f}"
         )
 
-        self.reset_view_button.clicked.connect(
-            self.reset_view
-        )
+        # Avança para o próximo ponto
+        self.selection_index += 1
 
-        self.axis_panel.select_point.connect(
-            self.graph_view.start_axis_selection
-        )
+        if self.selection_index >= len(self.selection_sequence):
+            self.axis_panel.set_selection_complete()
+            return
 
-        self.axis_panel.reset.connect(
-            self.graph_view.reset_axis_selection
-        )
+        next_point = self.selection_sequence[self.selection_index]
+
+        self.axis_panel.set_current_selection(next_point)
+
+        self.graph_view.start_axis_selection(next_point)
+
+    def reset_axis_selection(self):
+        self.selection_index = 0
+
+        self.graph_view.reset_axis_selection()
+
+        self.axis_panel.set_current_selection("X1")
+
+        self.graph_view.start_axis_selection("X1")
 
     def open_image(self):
         filename, _ = QFileDialog.getOpenFileName(
