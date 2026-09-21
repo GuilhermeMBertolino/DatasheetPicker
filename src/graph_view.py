@@ -20,8 +20,14 @@ class GraphView(QGraphicsView):
 
         self.image_item = None
 
+        self.axis_positions = {}
+        self.axis_lines = {}
+
         self.selection_mode = None
+
         self.axis_markers = {}
+        self.axis_positions = {}
+        self.axis_lines = {}
 
         self.setDragMode(
             QGraphicsView.DragMode.ScrollHandDrag
@@ -104,11 +110,12 @@ class GraphView(QGraphicsView):
         self.selection_mode = name
 
     def set_axis_marker(self, name, x, y):
-        # Remove previous marker
         if name in self.axis_markers:
             self.scene.removeItem(
                 self.axis_markers[name]
             )
+
+        self.axis_positions[name] = (x, y)
 
         if name in ("X1", "X2"):
             color = Qt.GlobalColor.red
@@ -134,11 +141,67 @@ class GraphView(QGraphicsView):
 
         self.axis_markers[name] = marker
 
+        self._update_axis_line(name)
+
+    def _update_axis_line(self, name):
+        if name in ("X1", "X2"):
+            point1_name = "X1"
+            point2_name = "X2"
+            color = Qt.GlobalColor.red
+        else:
+            point1_name = "Y1"
+            point2_name = "Y2"
+            color = Qt.GlobalColor.blue
+
+        # Ainda não temos os dois pontos
+        if (
+            point1_name not in self.axis_positions
+            or point2_name not in self.axis_positions
+        ):
+            return
+
+        x1, y1 = self.axis_positions[point1_name]
+        x2, y2 = self.axis_positions[point2_name]
+
+        # Remove linha anterior, caso exista
+        axis_name = point1_name[0]
+
+        if axis_name in self.axis_lines:
+            self.scene.removeItem(
+                self.axis_lines[axis_name]
+            )
+
+        # Cria nova linha
+        line = QGraphicsLineItem(
+            x1,
+            y1,
+            x2,
+            y2,
+        )
+
+        pen = QPen(color)
+        pen.setWidth(2)
+
+        line.setPen(pen)
+
+        # Linha atrás dos marcadores
+        line.setZValue(5)
+
+        self.scene.addItem(line)
+
+        self.axis_lines[axis_name] = line
+
     def reset_axis_selection(self):
         for marker in self.axis_markers.values():
             self.scene.removeItem(marker)
 
+        for line in self.axis_lines.values():
+            self.scene.removeItem(line)
+
         self.axis_markers.clear()
+        self.axis_positions.clear()
+        self.axis_lines.clear()
+
         self.selection_mode = None
 
     def _create_cross(self, x, y, color, size=2):
