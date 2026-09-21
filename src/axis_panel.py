@@ -22,13 +22,9 @@ class AxisPanel(QWidget):
     def _create_ui(self):
         layout = QVBoxLayout(self)
 
-        self.selection_label = QLabel(
-            "Selecting: X1"
-        )
+        self.selection_label = QLabel("Selecting: X1")
 
-        layout.addWidget(
-            self.selection_label
-        )
+        layout.addWidget(self.selection_label)
 
         x_group = QGroupBox("X Axis")
         x_layout = QFormLayout(x_group)
@@ -36,39 +32,21 @@ class AxisPanel(QWidget):
         self.x1_value = self._create_spinbox()
         self.x2_value = self._create_spinbox()
 
-        x_layout.addRow(
-            "X1:",
-            self.x1_value,
-        )
+        x_layout.addRow("X1:", self.x1_value)
 
-        x_layout.addRow(
-            "X2:",
-            self.x2_value,
-        )
+        x_layout.addRow("X2:", self.x2_value)
 
-        self.x_logarithmic = QCheckBox(
-            "Logarithmic X Axis"
-        )
+        self.x_logarithmic = QCheckBox("Logarithmic X Axis")
 
-        x_layout.addRow(
-            self.x_logarithmic
-        )
+        x_layout.addRow(self.x_logarithmic)
 
-        self.x1_button = QPushButton(
-            "Select X1"
-        )
+        self.x1_button = QPushButton("Select X1")
 
-        self.x2_button = QPushButton(
-            "Select X2"
-        )
+        self.x2_button = QPushButton("Select X2")
 
-        x_layout.addRow(
-            self.x1_button
-        )
+        x_layout.addRow(self.x1_button)
 
-        x_layout.addRow(
-            self.x2_button
-        )
+        x_layout.addRow(self.x2_button)
 
         y_group = QGroupBox("Y Axis")
         y_layout = QFormLayout(y_group)
@@ -76,79 +54,44 @@ class AxisPanel(QWidget):
         self.y1_value = self._create_spinbox()
         self.y2_value = self._create_spinbox()
 
-        y_layout.addRow(
-            "Y1:",
-            self.y1_value,
-        )
+        y_layout.addRow("Y1:", self.y1_value)
 
-        y_layout.addRow(
-            "Y2:",
-            self.y2_value,
-        )
+        y_layout.addRow("Y2:", self.y2_value)
 
-        self.y_logarithmic = QCheckBox(
-            "Logarithmic Y Axis"
-        )
+        self.y_logarithmic = QCheckBox("Logarithmic Y Axis")
 
-        y_layout.addRow(
-            self.y_logarithmic
-        )
+        y_layout.addRow(self.y_logarithmic)
 
-        self.y1_button = QPushButton(
-            "Select Y1"
-        )
+        self.y1_button = QPushButton("Select Y1")
 
-        self.y2_button = QPushButton(
-            "Select Y2"
-        )
+        self.y2_button = QPushButton("Select Y2")
 
-        y_layout.addRow(
-            self.y1_button
-        )
+        y_layout.addRow(self.y1_button)
 
-        y_layout.addRow(
-            self.y2_button
-        )
+        y_layout.addRow(self.y2_button)
 
-        self.reset_button = QPushButton(
-            "Reset Axis Selection"
-        )
+        self.reset_button = QPushButton("Reset Axis Selection")
 
         layout.addWidget(x_group)
         layout.addWidget(y_group)
-        layout.addWidget(
-            self.reset_button
-        )
+        layout.addWidget(self.reset_button)
 
         layout.addStretch()
 
-        self.x1_button.clicked.connect(
-            lambda: self._select("X1")
-        )
+        self.x1_button.clicked.connect(lambda: self._select("X1"))
 
-        self.x2_button.clicked.connect(
-            lambda: self._select("X2")
-        )
+        self.x2_button.clicked.connect(lambda: self._select("X2"))
 
-        self.y1_button.clicked.connect(
-            lambda: self._select("Y1")
-        )
+        self.y1_button.clicked.connect(lambda: self._select("Y1"))
 
-        self.y2_button.clicked.connect(
-            lambda: self._select("Y2")
-        )
+        self.y2_button.clicked.connect(lambda: self._select("Y2"))
 
-        self.reset_button.clicked.connect(
-            self.reset.emit
-        )
+        self.reset_button.clicked.connect(self.reset.emit)
 
     def _create_spinbox(self):
         spinbox = QDoubleSpinBox()
 
-        spinbox.setRange(
-            -1e12,
-            1e12,
-        )
+        spinbox.setRange(-1e12, 1e12)
 
         spinbox.setDecimals(6)
         spinbox.setSingleStep(1.0)
@@ -180,14 +123,10 @@ class AxisPanel(QWidget):
         button.setCheckable(True)
         button.setChecked(True)
 
-        button.setStyleSheet(
-            "font-weight: bold;"
-        )
+        button.setStyleSheet("font-weight: bold;")
 
     def set_selection_complete(self):
-        self.selection_label.setText(
-            "Axis calibration points complete."
-        )
+        self.selection_label.setText("Axis calibration points complete.")
 
         for button in (
             self.x1_button,

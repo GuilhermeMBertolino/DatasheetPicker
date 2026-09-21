@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (
 from axis_panel import AxisPanel
 from graph_view import GraphView
 
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -29,7 +28,6 @@ class MainWindow(QMainWindow):
         self._create_ui()
         self._connect_signals()
 
-        # Start calibration at X1
         self.axis_panel.set_current_selection("X1")
         self.graph_view.start_axis_selection("X1")
 
@@ -75,22 +73,16 @@ class MainWindow(QMainWindow):
         self.graph_view.clicked.connect(self.on_graph_clicked)
 
     def select_axis_point(self, name):
-        # Atualiza visualmente o painel
         self.axis_panel.set_current_selection(name)
 
-        # Diz ao GraphView qual será o próximo clique
         self.graph_view.start_axis_selection(name)
 
-        # Atualiza o índice da sequência para continuar
-        # depois deste ponto
         self.selection_index = (
             self.selection_sequence.index(name)
         )
 
     def on_graph_clicked(self, x, y):
-        if self.selection_index >= len(
-            self.selection_sequence
-        ):
+        if self.selection_index >= len(self.selection_sequence):
             return
 
         current_point = self.selection_sequence[self.selection_index]

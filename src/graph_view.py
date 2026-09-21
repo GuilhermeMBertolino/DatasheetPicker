@@ -29,17 +29,11 @@ class GraphView(QGraphicsView):
         self.axis_positions = {}
         self.axis_lines = {}
 
-        self.setDragMode(
-            QGraphicsView.DragMode.ScrollHandDrag
-        )
+        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
-        self.setTransformationAnchor(
-            QGraphicsView.ViewportAnchor.AnchorUnderMouse
-        )
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
 
-        self.setResizeAnchor(
-            QGraphicsView.ViewportAnchor.AnchorUnderMouse
-        )
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
 
     def load_image(self, filename):
         pixmap = QPixmap(filename)
@@ -69,24 +63,14 @@ class GraphView(QGraphicsView):
         zoom_factor = 1.15
 
         if event.angleDelta().y() > 0:
-            self.scale(
-                zoom_factor,
-                zoom_factor,
-            )
+            self.scale(zoom_factor, zoom_factor)
         else:
-            self.scale(
-                1 / zoom_factor,
-                1 / zoom_factor,
-            )
+            self.scale(1 / zoom_factor, 1 / zoom_factor)
 
     def mousePressEvent(self, event):
-        if (
-            event.button() == Qt.MouseButton.LeftButton
-            and self.selection_mode is not None
-        ):
-            scene_pos = self.mapToScene(
-                event.position().toPoint()
-            )
+        if (event.button() == Qt.MouseButton.LeftButton
+            and self.selection_mode is not None):
+            scene_pos = self.mapToScene(event.position().toPoint())
 
             if self._inside_image(scene_pos):
                 self.set_axis_marker(
@@ -109,9 +93,7 @@ class GraphView(QGraphicsView):
 
     def set_axis_marker(self, name, x, y):
         if name in self.axis_markers:
-            self.scene.removeItem(
-                self.axis_markers[name]
-            )
+            self.scene.removeItem(self.axis_markers[name])
 
         self.axis_positions[name] = (x, y)
 
@@ -121,17 +103,9 @@ class GraphView(QGraphicsView):
             color = Qt.GlobalColor.blue
 
         if name in ("X1", "Y1"):
-            marker = self._create_cross(
-                x,
-                y,
-                color,
-            )
+            marker = self._create_cross(x, y, color)
         else:
-            marker = self._create_circle(
-                x,
-                y,
-                color,
-            )
+            marker = self._create_circle(x, y, color)
 
         self.scene.addItem(marker)
 
@@ -151,38 +125,25 @@ class GraphView(QGraphicsView):
             point2_name = "Y2"
             color = Qt.GlobalColor.blue
 
-        # Ainda não temos os dois pontos
-        if (
-            point1_name not in self.axis_positions
-            or point2_name not in self.axis_positions
-        ):
+        if (point1_name not in self.axis_positions
+            or point2_name not in self.axis_positions):
             return
 
         x1, y1 = self.axis_positions[point1_name]
         x2, y2 = self.axis_positions[point2_name]
 
-        # Remove linha anterior, caso exista
         axis_name = point1_name[0]
 
         if axis_name in self.axis_lines:
-            self.scene.removeItem(
-                self.axis_lines[axis_name]
-            )
+            self.scene.removeItem(self.axis_lines[axis_name])
 
-        # Cria nova linha
-        line = QGraphicsLineItem(
-            x1,
-            y1,
-            x2,
-            y2,
-        )
+        line = QGraphicsLineItem(x1, y1, x2, y2,)
 
         pen = QPen(color)
         pen.setWidth(2)
 
         line.setPen(pen)
 
-        # Linha atrás dos marcadores
         line.setZValue(5)
 
         self.scene.addItem(line)
@@ -253,10 +214,6 @@ class GraphView(QGraphicsView):
         if self.image_item is None:
             return False
 
-        local_pos = self.image_item.mapFromScene(
-            scene_pos
-        )
+        local_pos = self.image_item.mapFromScene(scene_pos)
 
-        return self.image_item.contains(
-            local_pos
-        )
+        return self.image_item.contains(local_pos)
