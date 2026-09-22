@@ -14,6 +14,7 @@ class AxisPanel(QWidget):
     select_point = Signal(str)
     reset = Signal()
     mode_points = Signal()
+    mode_calibration = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -34,7 +35,6 @@ class AxisPanel(QWidget):
         self.x2_value = self._create_spinbox()
 
         x_layout.addRow("X1:", self.x1_value)
-
         x_layout.addRow("X2:", self.x2_value)
 
         self.x_logarithmic = QCheckBox("Logarithmic X Axis")
@@ -42,11 +42,9 @@ class AxisPanel(QWidget):
         x_layout.addRow(self.x_logarithmic)
 
         self.x1_button = QPushButton("Select X1")
-
         self.x2_button = QPushButton("Select X2")
 
         x_layout.addRow(self.x1_button)
-
         x_layout.addRow(self.x2_button)
 
         y_group = QGroupBox("Y Axis")
@@ -56,7 +54,6 @@ class AxisPanel(QWidget):
         self.y2_value = self._create_spinbox()
 
         y_layout.addRow("Y1:", self.y1_value)
-
         y_layout.addRow("Y2:", self.y2_value)
 
         self.y_logarithmic = QCheckBox("Logarithmic Y Axis")
@@ -64,18 +61,16 @@ class AxisPanel(QWidget):
         y_layout.addRow(self.y_logarithmic)
 
         self.y1_button = QPushButton("Select Y1")
-
         self.y2_button = QPushButton("Select Y2")
 
         y_layout.addRow(self.y1_button)
-
         y_layout.addRow(self.y2_button)
 
         self.reset_button = QPushButton("Reset Axis Selection")
-
         self.finish_button = QPushButton("Finish Calibration")
 
         self.finish_button.setEnabled(False)
+        self.reset_button.setEnabled(True)
 
         layout.addWidget(x_group)
         layout.addWidget(y_group)
@@ -94,7 +89,7 @@ class AxisPanel(QWidget):
 
         self.reset_button.clicked.connect(self.reset.emit)
 
-        self.finish_button.clicked.connect(self.mode_points.emit)
+        self.finish_button.clicked.connect(self._toggle_mode)
 
     def _create_spinbox(self):
         spinbox = QDoubleSpinBox()
@@ -150,7 +145,29 @@ class AxisPanel(QWidget):
     def set_calibration_complete(self):
         self.selection_label.setText("Axis calibration complete.")
         self.finish_button.setEnabled(True)
+        self.finish_button.setText("Finish Calibration")
+        self.reset_button.setEnabled(True)
 
     def set_points_mode(self):
         self.selection_label.setText("Mode: Points")
+        self.finish_button.setEnabled(True)
+        self.finish_button.setText("Edit Calibration")
+        self.reset_button.setEnabled(False)
+
+    def set_calibration_mode(self):
+        self.selection_label.setText("Mode: Axis Calibration")
+        self.finish_button.setEnabled(True)
+        self.finish_button.setText("Finish Calibration")
+        self.reset_button.setEnabled(True)
+
+    def set_calibration_reset(self):
+        self.selection_label.setText("Selecting: X1")
         self.finish_button.setEnabled(False)
+        self.finish_button.setText("Finish Calibration")
+        self.reset_button.setEnabled(True)
+
+    def _toggle_mode(self):
+        if self.finish_button.text() == "Finish Calibration":
+            self.mode_points.emit()
+        else:
+            self.mode_calibration.emit()

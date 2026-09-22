@@ -65,16 +65,15 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self):
         self.open_button.clicked.connect(self.open_image)
-
         self.reset_view_button.clicked.connect(self.reset_view)
 
         self.axis_panel.select_point.connect(self.select_axis_point)
-
         self.axis_panel.reset.connect(self.reset_axis_selection)
+        self.axis_panel.mode_points.connect(self.start_points_mode)
+        self.axis_panel.mode_calibration.connect(self.start_calibration_mode)
 
         self.graph_view.clicked.connect(self.on_graph_clicked)
 
-        self.axis_panel.mode_points.connect(self.start_points_mode)
 
     def select_axis_point(self, name):
         self.axis_panel.set_current_selection(name)
@@ -113,8 +112,9 @@ class MainWindow(QMainWindow):
 
         self.graph_view.reset_axis_selection()
 
-        self.axis_panel.set_current_selection("X1")
+        self.axis_panel.set_calibration_reset()
 
+        self.axis_panel.set_current_selection("X1")
         self.graph_view.start_axis_selection("X1")
 
     def open_image(self):
@@ -130,9 +130,7 @@ class MainWindow(QMainWindow):
         if not filename:
             return
 
-        self.graph_view.load_image(
-            filename
-        )
+        self.graph_view.load_image(filename)
 
     def reset_view(self):
         if self.graph_view.image_item is None:
@@ -146,11 +144,19 @@ class MainWindow(QMainWindow):
     def start_points_mode(self):
         self.mode = "points"
 
-        self.graph_view.set_mode(
-            "points"
-        )
+        self.graph_view.set_mode("points")
 
         self.axis_panel.set_points_mode()
+
+    def start_calibration_mode(self):
+        self.mode = "calibration"
+
+        self.graph_view.set_mode("calibration")
+        self.axis_panel.set_calibration_mode()
+
+        self.selection_index = 0
+        self.axis_panel.set_current_selection("X1")
+        self.graph_view.start_axis_selection("X1")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
