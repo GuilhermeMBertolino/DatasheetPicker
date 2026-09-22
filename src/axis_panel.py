@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 class AxisPanel(QWidget):
     select_point = Signal(str)
     reset = Signal()
+    mode_points = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -72,9 +73,14 @@ class AxisPanel(QWidget):
 
         self.reset_button = QPushButton("Reset Axis Selection")
 
+        self.finish_button = QPushButton("Finish Calibration")
+
+        self.finish_button.setEnabled(False)
+
         layout.addWidget(x_group)
         layout.addWidget(y_group)
         layout.addWidget(self.reset_button)
+        layout.addWidget(self.finish_button)
 
         layout.addStretch()
 
@@ -87,6 +93,8 @@ class AxisPanel(QWidget):
         self.y2_button.clicked.connect(lambda: self._select("Y2"))
 
         self.reset_button.clicked.connect(self.reset.emit)
+
+        self.finish_button.clicked.connect(self.mode_points.emit)
 
     def _create_spinbox(self):
         spinbox = QDoubleSpinBox()
@@ -125,18 +133,6 @@ class AxisPanel(QWidget):
 
         button.setStyleSheet("font-weight: bold;")
 
-    def set_selection_complete(self):
-        self.selection_label.setText("Axis calibration points complete.")
-
-        for button in (
-            self.x1_button,
-            self.x2_button,
-            self.y1_button,
-            self.y2_button,
-        ):
-            button.setChecked(False)
-            button.setStyleSheet("")
-
     def get_values(self):
         return {
             "X1": self.x1_value.value(),
@@ -150,3 +146,11 @@ class AxisPanel(QWidget):
 
     def is_y_logarithmic(self):
         return self.y_logarithmic.isChecked()
+
+    def set_calibration_complete(self):
+        self.selection_label.setText("Axis calibration complete.")
+        self.finish_button.setEnabled(True)
+
+    def set_points_mode(self):
+        self.selection_label.setText("Mode: Points")
+        self.finish_button.setEnabled(False)

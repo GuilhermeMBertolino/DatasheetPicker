@@ -25,6 +25,8 @@ class MainWindow(QMainWindow):
 
         self.selection_index = 0
 
+        self.mode = "calibration"
+
         self._create_ui()
         self._connect_signals()
 
@@ -72,6 +74,8 @@ class MainWindow(QMainWindow):
 
         self.graph_view.clicked.connect(self.on_graph_clicked)
 
+        self.axis_panel.mode_points.connect(self.start_points_mode)
+
     def select_axis_point(self, name):
         self.axis_panel.set_current_selection(name)
 
@@ -95,7 +99,7 @@ class MainWindow(QMainWindow):
         self.selection_index += 1
 
         if self.selection_index >= len(self.selection_sequence):
-            self.axis_panel.set_selection_complete()
+            self.axis_panel.set_calibration_complete()
             return
 
         next_point = self.selection_sequence[self.selection_index]
@@ -138,6 +142,15 @@ class MainWindow(QMainWindow):
             self.graph_view.image_item,
             Qt.AspectRatioMode.KeepAspectRatio,
         )
+
+    def start_points_mode(self):
+        self.mode = "points"
+
+        self.graph_view.set_mode(
+            "points"
+        )
+
+        self.axis_panel.set_points_mode()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

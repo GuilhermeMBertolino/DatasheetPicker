@@ -29,6 +29,12 @@ class GraphView(QGraphicsView):
         self.axis_positions = {}
         self.axis_lines = {}
 
+        self.mode = "calibration"
+
+        self.data_points = []
+        self.data_markers = []
+        self.data_lines = []
+
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
@@ -68,23 +74,22 @@ class GraphView(QGraphicsView):
             self.scale(1 / zoom_factor, 1 / zoom_factor)
 
     def mousePressEvent(self, event):
-        if (event.button() == Qt.MouseButton.LeftButton
-            and self.selection_mode is not None):
-            scene_pos = self.mapToScene(event.position().toPoint())
+        if event.button() != Qt.MouseButton.LeftButton:
+            super().mousePressEvent(event)
+            return
 
-            if self._inside_image(scene_pos):
-                self.set_axis_marker(
-                    self.selection_mode,
-                    scene_pos.x(),
-                    scene_pos.y(),
-                )
+        scene_pos = self.mapToScene(event.position().toPoint())
 
-                self.clicked.emit(
-                    scene_pos.x(),
-                    scene_pos.y(),
-                )
+        if not self._inside_image(scene_pos):
+            super().mousePressEvent(event)
+            return
 
-                return
+        if self.mode == "calibration":
+            self._handle_calibration_click(scene_pos)
+
+        elif self.mode == "points":
+            self._handle_point_click(scene_pos)
+            return
 
         super().mousePressEvent(event)
 
@@ -150,6 +155,9 @@ class GraphView(QGraphicsView):
 
         self.axis_lines[axis_name] = line
 
+    def set_mode(self, mode):
+        self.mode = mode
+
     def reset_axis_selection(self):
         for marker in self.axis_markers.values():
             self.scene.removeItem(marker)
@@ -162,6 +170,17 @@ class GraphView(QGraphicsView):
         self.axis_lines.clear()
 
         self.selection_mode = None
+
+    def reset_data_points(self):
+        for marker in self.data_markers:
+            self.scene.removeItem(marker)
+
+        for line in self.data_lines:
+            self.scene.removeItem(line)
+
+        self.data_points.clear()
+        self.data_markers.clear()
+        self.data_lines.clear()
 
     def _create_cross(self, x, y, color, size=2):
         pen = QPen(color)
@@ -217,3 +236,59 @@ class GraphView(QGraphicsView):
         local_pos = self.image_item.mapFromScene(scene_pos)
 
         return self.image_item.contains(local_pos)
+
+    def _handle_calibration_click(self, scene_pos):
+        if self.selection_mode is None:
+            return
+
+        self.set_axis_marker(
+            self.selection_mode,
+            scene_pos.x(),
+            scene_pos.y(),
+        )
+
+        self.clicked.emit(
+            scene_pos.x(),
+            scene_pos.y(),
+        )
+
+    def _handle_point_click(self, scene_pos):
+        x = scene_pos.x()
+        y = scene_pos.y()
+
+        self.data_points.append((x, y))
+
+        marker = self._create_data_marker(x, y)
+
+        self.scene.addItem(marker)
+        marker.setZValue(20)
+
+        self.data_markers.append(marker)
+
+        if len(self.data_points) >= 2:
+            x1, y1 = self.data_points[-2]
+
+            line = QGraphicsLineItem(x1, y1, x, y)
+
+            pen = QPen(Qt.GlobalColor.green)
+            pen.setWidth(2)
+
+            line.setPen(pen)
+            line.setZValue(15)
+
+            self.scene.addItem(line)
+
+            self.data_lines.append(line)
+
+    def _create_data_marker(self, x, y, radius=1):
+        marker = QGraphicsEllipseItem(
+            x - radius,
+            y - radius,
+            2 * radius,
+            2 * radius,
+        )
+
+        marker.setBrush(QBrush(Qt.GlobalColor.green))
+        marker.setPen(QPen(Qt.GlobalColor.green))
+
+        return marker
