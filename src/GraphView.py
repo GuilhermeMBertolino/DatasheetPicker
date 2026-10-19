@@ -255,6 +255,20 @@ class GraphView(QGraphicsView):
         if active_graph_id is not None:
             self.set_active_graph(active_graph_id)
 
+    def remove_last_data_point(self):
+        if not self.data_points:
+            return False
+
+        marker = self.data_markers.pop()
+        self.scene.removeItem(marker)
+        self.data_points.pop()
+
+        if self.data_lines:
+            line = self.data_lines.pop()
+            self.scene.removeItem(line)
+
+        return True
+
     def _create_cross(self, x, y, color, size=2):
         pen = QPen(color)
         pen.setWidth(1)

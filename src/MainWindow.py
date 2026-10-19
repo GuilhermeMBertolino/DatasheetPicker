@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -82,6 +83,26 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self.export_active_button)
         toolbar.addWidget(self.export_all_button)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
+        self._create_shortcuts()
+
+    def _create_shortcuts(self):
+        actions = (
+            ("Open Image", "Ctrl+O", self.open_image),
+            ("Reset View", "Ctrl+R", self.reset_view),
+            ("Add Graph", "Ctrl+N", self.add_graph),
+            ("Remove Graph", "Ctrl+Delete", self.remove_active_graph),
+            ("Export Active CSV", "Ctrl+E", self.export_active_csv),
+            ("Export All CSV", "Ctrl+Shift+E", self.export_all_csv),
+            ("Undo Last Point", "Ctrl+Z", self.undo_last_point),
+        )
+
+        self.shortcut_actions = []
+        for text, shortcut, handler in actions:
+            action = QAction(text, self)
+            action.setShortcut(QKeySequence(shortcut))
+            action.triggered.connect(handler)
+            self.addAction(action)
+            self.shortcut_actions.append(action)
 
     def _connect_signals(self):
         self.open_button.clicked.connect(self.open_image)
@@ -141,7 +162,7 @@ class MainWindow(QMainWindow):
         self.graph_view.set_mode(self.mode)
         self.update_calibrated_points()
 
-    def add_graph(self, _graph_id):
+    def add_graph(self, _graph_id=None):
         graph_number = len(self.graphs) + 1
         color = self.graph_colors[(graph_number - 1) % len(self.graph_colors)]
         graph = self.graphs.add(f"Graph {graph_number}", color)
@@ -162,6 +183,10 @@ class MainWindow(QMainWindow):
         self.graphs.remove(graph_id)
         if was_active:
             self._activate_graph(next(iter(self.graphs)))
+
+    def remove_active_graph(self):
+        if self.active_graph_id is not None:
+            self.remove_graph(self.active_graph_id)
 
     def set_graph_visibility(self, graph_id, visible):
         graph = self.graphs.get(graph_id)
@@ -192,6 +217,18 @@ class MainWindow(QMainWindow):
         graph = self.graphs.get(self.active_graph_id)
         graph.points.append(DataPoint(pixel_x, pixel_y, value_x, value_y))
         self._refresh_graph(graph)
+
+    def undo_last_point(self):
+        if self.active_graph_id is None:
+            return
+
+        graph = self.graphs.get(self.active_graph_id)
+        if not graph.points:
+            return
+
+        if self.graph_view.remove_last_data_point():
+            graph.points.pop()
+            self._refresh_graph(graph)
 
     def _convert_point(self, pixel_x, pixel_y):
         try:
@@ -304,3 +341,9 @@ class MainWindow(QMainWindow):
             )
         except (ImportError, OSError, ValueError) as error:
             QMessageBox.critical(self, "Export failed", str(error))
+
+    def export_active_csv(self):
+        self.export_graphs("csv", False)
+
+    def export_all_csv(self):
+        self.export_graphs("csv", True)
