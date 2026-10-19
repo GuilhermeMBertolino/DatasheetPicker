@@ -1,5 +1,5 @@
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QPen, QPixmap
+from PySide6.QtCore import QPoint, QRect, QTimer, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QGraphicsEllipseItem,
     QGraphicsLineItem,
@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QGraphicsPixmapItem,
     QGraphicsScene,
     QGraphicsView,
+    QLabel,
 )
 
 class GraphView(QGraphicsView):
@@ -39,6 +40,107 @@ class GraphView(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
 
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+
+        self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
+        self.viewport().setCursor(Qt.CursorShape.CrossCursor)
+
+        self.magnifier_enabled = False
+        self.magnifier_size = 180
+        self.magnifier_label = QLabel(self.viewport())
+        self.magnifier_label.setFixedSize(
+            self.magnifier_size,
+            self.magnifier_size,
+        )
+        self.magnifier_label.setStyleSheet(
+            "background: white; border: 2px solid #333;"
+        )
+        self.magnifier_label.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents
+        )
+        self.magnifier_label.hide()
+
+    def set_magnifier_enabled(self, enabled):
+        self.magnifier_enabled = enabled
+        if not enabled:
+            self.magnifier_label.hide()
+            self.viewport().setCursor(Qt.CursorShape.CrossCursor)
+
+    def mouseMoveEvent(self, event):
+        scene_pos = self.mapToScene(event.position().toPoint())
+        if self.magnifier_enabled and self._inside_image(scene_pos):
+            self._update_magnifier(
+                scene_pos,
+                event.position().toPoint(),
+            )
+        else:
+            self.magnifier_label.hide()
+            self.viewport().setCursor(Qt.CursorShape.CrossCursor)
+
+        super().mouseMoveEvent(event)
+        QTimer.singleShot(0, self._restore_cursor)
+
+    def leaveEvent(self, event):
+        self.magnifier_label.hide()
+        self.viewport().setCursor(Qt.CursorShape.CrossCursor)
+        super().leaveEvent(event)
+
+    def _update_magnifier(self, scene_pos, viewport_pos):
+        self.viewport().setCursor(Qt.CursorShape.BlankCursor)
+        source_pixmap = self.image_item.pixmap()
+        image_pos = self.image_item.mapFromScene(scene_pos)
+        source_x = int(image_pos.x())
+        source_y = int(image_pos.y())
+        source_radius = 25
+        source_rect = QRect(
+            source_x - source_radius,
+            source_y - source_radius,
+            source_radius * 2,
+            source_radius * 2,
+        ).intersected(source_pixmap.rect())
+
+        if source_rect.isEmpty():
+            self.magnifier_label.hide()
+            return
+
+        zoomed = source_pixmap.copy(source_rect).scaled(
+            self.magnifier_size - 8,
+            self.magnifier_size - 8,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.FastTransformation,
+        )
+        display = QPixmap(self.magnifier_label.size())
+        display.fill(Qt.GlobalColor.white)
+        painter = QPainter(display)
+        offset_x = (display.width() - zoomed.width()) // 2
+        offset_y = (display.height() - zoomed.height()) // 2
+        painter.drawPixmap(offset_x, offset_y, zoomed)
+        painter.setPen(QPen(Qt.GlobalColor.red, 1))
+        center_x = display.width() // 2
+        center_y = display.height() // 2
+        painter.drawLine(center_x - 10, center_y, center_x + 10, center_y)
+        painter.drawLine(center_x, center_y - 10, center_x, center_y + 10)
+        painter.end()
+
+        self.magnifier_label.setPixmap(display)
+        self._move_magnifier(viewport_pos)
+        self.magnifier_label.show()
+
+    def _move_magnifier(self, cursor_pos):
+        viewport_rect = self.viewport().rect()
+        position = cursor_pos - QPoint(
+            self.magnifier_size // 2,
+            self.magnifier_size // 2,
+        )
+        position.setX(max(0, position.x()))
+        position.setY(max(0, position.y()))
+        position.setX(
+            min(position.x(), viewport_rect.width() - self.magnifier_size)
+        )
+        position.setY(
+            min(position.y(), viewport_rect.height() - self.magnifier_size)
+        )
+        self.magnifier_label.move(position)
 
     def add_graph(self, graph_id, color=None):
         self.graph_layers[graph_id] = {
@@ -138,12 +240,14 @@ class GraphView(QGraphicsView):
     def mousePressEvent(self, event):
         if event.button() != Qt.MouseButton.LeftButton:
             super().mousePressEvent(event)
+            QTimer.singleShot(0, self._restore_cursor)
             return
 
         scene_pos = self.mapToScene(event.position().toPoint())
 
         if not self._inside_image(scene_pos):
             super().mousePressEvent(event)
+            QTimer.singleShot(0, self._restore_cursor)
             return
 
         if self.mode == "calibration":
@@ -151,9 +255,18 @@ class GraphView(QGraphicsView):
 
         elif self.mode == "points":
             self._handle_point_click(scene_pos)
+            if self.magnifier_enabled:
+                self.viewport().setCursor(Qt.CursorShape.BlankCursor)
+            else:
+                QTimer.singleShot(0, self._restore_cursor)
             return
 
         super().mousePressEvent(event)
+        QTimer.singleShot(0, self._restore_cursor)
+
+    def _restore_cursor(self):
+        if not self.magnifier_enabled:
+            self.viewport().setCursor(Qt.CursorShape.CrossCursor)
 
     def start_axis_selection(self, name):
         self.selection_mode = name

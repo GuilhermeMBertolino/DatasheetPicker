@@ -75,6 +75,9 @@ class MainWindow(QMainWindow):
         self.reset_view_button = QPushButton("Reset View")
         self.export_active_button = QPushButton("Export Active")
         self.export_all_button = QPushButton("Export All")
+        self.magnifier_button = QPushButton("Magnifier")
+        self.magnifier_button.setCheckable(True)
+        self.magnifier_button.setToolTip("Toggle the magnifier")
         self.export_active_button.setMenu(self._create_export_menu(False))
         self.export_all_button.setMenu(self._create_export_menu(True))
 
@@ -82,6 +85,7 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self.reset_view_button)
         toolbar.addWidget(self.export_active_button)
         toolbar.addWidget(self.export_all_button)
+        toolbar.addWidget(self.magnifier_button)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
         self._create_shortcuts()
 
@@ -93,6 +97,7 @@ class MainWindow(QMainWindow):
             ("Remove Graph", "Ctrl+Delete", self.remove_active_graph),
             ("Export Active CSV", "Ctrl+E", self.export_active_csv),
             ("Export All CSV", "Ctrl+Shift+E", self.export_all_csv),
+            ("Toggle Magnifier", "Ctrl+M", self.toggle_magnifier),
             ("Undo Last Point", "Ctrl+Z", self.undo_last_point),
         )
 
@@ -107,6 +112,9 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         self.open_button.clicked.connect(self.open_image)
         self.reset_view_button.clicked.connect(self.reset_view)
+        self.magnifier_button.toggled.connect(
+            self.graph_view.set_magnifier_enabled
+        )
         self.axis_panel.select_point.connect(self.select_axis_point)
         self.axis_panel.reset.connect(self.reset_axis_selection)
         self.axis_panel.mode_points.connect(self.start_points_mode)
@@ -192,6 +200,11 @@ class MainWindow(QMainWindow):
         graph = self.graphs.get(graph_id)
         graph.visible = visible
         self.graph_view.set_graph_visible(graph_id, visible)
+
+    def toggle_magnifier(self):
+        self.magnifier_button.setChecked(
+            not self.magnifier_button.isChecked()
+        )
 
     def select_axis_point(self, name):
         self.axis_panel.set_current_selection(name)

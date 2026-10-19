@@ -16,6 +16,7 @@ Author: Guilherme M Bertolino
 | `Ctrl+Delete` | Remove active graph |
 | `Ctrl+E` | Export active graph as CSV |
 | `Ctrl+Shift+E` | Export all graphs as CSV |
+| `Ctrl+M` | Toggle magnifier |
 | `Ctrl+Z` | Remove the last point from the active graph |
 
 `Ctrl+Z` can be repeated to remove multiple points in reverse order.
