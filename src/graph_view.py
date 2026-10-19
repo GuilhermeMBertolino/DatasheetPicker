@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 
 class GraphView(QGraphicsView):
     clicked = Signal(float, float)
+    point_added = Signal(int, float, float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -49,10 +50,15 @@ class GraphView(QGraphicsView):
 
         self.scene.clear()
 
+        self.axis_markers.clear()
+        self.axis_positions.clear()
+        self.axis_lines.clear()
+        self.data_points.clear()
+        self.data_markers.clear()
+        self.data_lines.clear()
+
         self.image_item = QGraphicsPixmapItem(pixmap)
         self.scene.addItem(self.image_item)
-
-        self.axis_markers.clear()
 
         self.scene.setSceneRect(
             self.image_item.boundingRect()
@@ -264,6 +270,12 @@ class GraphView(QGraphicsView):
         marker.setZValue(20)
 
         self.data_markers.append(marker)
+
+        self.point_added.emit(
+            len(self.data_points),
+            x,
+            y,
+        )
 
         if len(self.data_points) >= 2:
             x1, y1 = self.data_points[-2]

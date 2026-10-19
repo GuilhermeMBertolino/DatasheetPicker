@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
 
 from axis_panel import AxisPanel
 from graph_view import GraphView
+from points_panel import PointsPanel
+from utils import pixel_to_data_coordinates
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -39,12 +41,16 @@ class MainWindow(QMainWindow):
 
         self.axis_panel = AxisPanel()
         self.graph_view = GraphView()
+        self.points_panel = PointsPanel()
 
         self.axis_panel.setMinimumWidth(260)
         self.axis_panel.setMaximumWidth(320)
+        self.points_panel.setMinimumWidth(250)
+        self.points_panel.setMaximumWidth(360)
 
         layout.addWidget(self.axis_panel)
         layout.addWidget(self.graph_view)
+        layout.addWidget(self.points_panel)
 
         self.setCentralWidget(central)
 
@@ -73,6 +79,7 @@ class MainWindow(QMainWindow):
         self.axis_panel.mode_calibration.connect(self.start_calibration_mode)
 
         self.graph_view.clicked.connect(self.on_graph_clicked)
+        self.graph_view.point_added.connect(self.add_point_to_tree)
 
 
     def select_axis_point(self, name):
@@ -111,11 +118,34 @@ class MainWindow(QMainWindow):
         self.selection_index = 0
 
         self.graph_view.reset_axis_selection()
+        self.graph_view.reset_data_points()
+        self.points_panel.clear_points()
 
         self.axis_panel.set_calibration_reset()
 
         self.axis_panel.set_current_selection("X1")
         self.graph_view.start_axis_selection("X1")
+
+    def add_point_to_tree(self, number, x, y):
+        try:
+            value_x, value_y = pixel_to_data_coordinates(
+                x,
+                y,
+                self.graph_view.axis_positions,
+                self.axis_panel.get_values(),
+                self.axis_panel.is_x_logarithmic(),
+                self.axis_panel.is_y_logarithmic(),
+            )
+        except (KeyError, ValueError):
+            value_x, value_y = x, y
+
+        self.points_panel.add_point(
+            number,
+            x,
+            y,
+            value_x,
+            value_y,
+        )
 
     def open_image(self):
         filename, _ = QFileDialog.getOpenFileName(
@@ -130,7 +160,8 @@ class MainWindow(QMainWindow):
         if not filename:
             return
 
-        self.graph_view.load_image(filename)
+        if self.graph_view.load_image(filename):
+            self.points_panel.clear_points()
 
     def reset_view(self):
         if self.graph_view.image_item is None:
@@ -153,6 +184,8 @@ class MainWindow(QMainWindow):
 
         self.graph_view.set_mode("calibration")
         self.axis_panel.set_calibration_mode()
+        self.graph_view.reset_data_points()
+        self.points_panel.clear_points()
 
         self.selection_index = 0
         self.axis_panel.set_current_selection("X1")
