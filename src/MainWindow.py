@@ -11,12 +11,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from axis_panel import AxisPanel
+from AxisPanel import AxisPanel
 from calibration import pixel_to_data_coordinates
-from export_service import ExportService
+from ExportService import ExportService
 from graph_models import DataPoint, GraphCollection
-from graph_view import GraphView
-from points_panel import PointsPanel
+from GraphView import GraphView
+from PointsPanel import PointsPanel
 
 
 class MainWindow(QMainWindow):
