@@ -28,9 +28,21 @@ class MainWindow(QMainWindow):
         self.selection_index = 0
 
         self.mode = "calibration"
+        self.graphs = {}
+        self.active_graph_id = None
+        self.graph_colors = [
+            "#2ecc71",
+            "#e67e22",
+            "#3498db",
+            "#e84393",
+            "#f1c40f",
+        ]
 
         self._create_ui()
         self._connect_signals()
+
+        self._create_graph("graph-1", "Graph 1", self.graph_colors[0])
+        self._activate_graph("graph-1")
 
         self.axis_panel.set_current_selection("X1")
         self.graph_view.start_axis_selection("X1")
@@ -95,6 +107,52 @@ class MainWindow(QMainWindow):
 
         self.graph_view.clicked.connect(self.on_graph_clicked)
         self.graph_view.point_added.connect(self.add_point_to_tree)
+        self.points_panel.graph_added.connect(self.add_graph)
+        self.points_panel.graph_selected.connect(self.select_graph)
+        self.points_panel.graph_removed.connect(self.remove_graph)
+        self.points_panel.graph_visibility_changed.connect(
+            self.set_graph_visibility
+        )
+
+    def _create_graph(self, graph_id, name, color):
+        self.graphs[graph_id] = {"name": name}
+        self.graph_view.add_graph(graph_id, color)
+        self.points_panel.add_graph(graph_id, name)
+
+    def _activate_graph(self, graph_id):
+        if graph_id not in self.graphs:
+            return
+
+        self.active_graph_id = graph_id
+        self.graph_view.set_active_graph(graph_id)
+        self.points_panel.set_active_graph(graph_id)
+        self.graph_view.set_mode(self.mode)
+        self.update_calibrated_points()
+
+    def add_graph(self, graph_id):
+        graph_number = len(self.graphs) + 1
+        color = self.graph_colors[(graph_number - 1) % len(self.graph_colors)]
+        self._create_graph(graph_id, f"Graph {graph_number}", color)
+        self._activate_graph(graph_id)
+        self.start_points_mode()
+
+    def select_graph(self, graph_id):
+        self._activate_graph(graph_id)
+
+    def remove_graph(self, graph_id):
+        if len(self.graphs) <= 1 or graph_id not in self.graphs:
+            return
+
+        was_active = graph_id == self.active_graph_id
+        self.graph_view.remove_graph(graph_id)
+        self.points_panel.remove_graph(graph_id)
+        del self.graphs[graph_id]
+
+        if was_active:
+            self._activate_graph(next(iter(self.graphs)))
+
+    def set_graph_visibility(self, graph_id, visible):
+        self.graph_view.set_graph_visible(graph_id, visible)
 
 
     def select_axis_point(self, name):
@@ -135,8 +193,9 @@ class MainWindow(QMainWindow):
         self.selection_index = 0
 
         self.graph_view.reset_axis_selection()
-        self.graph_view.reset_data_points()
-        self.points_panel.clear_points()
+        self.graph_view.reset_all_data_points()
+        for graph_id in self.graphs:
+            self.points_panel.clear_points(graph_id)
 
         self.axis_panel.set_calibration_reset()
 
@@ -147,6 +206,7 @@ class MainWindow(QMainWindow):
         value_x, value_y = self._convert_point(x, y)
 
         self.points_panel.add_point(
+            self.active_graph_id,
             number,
             x,
             y,
@@ -168,7 +228,11 @@ class MainWindow(QMainWindow):
             return x, y
 
     def update_calibrated_points(self, *_args):
-        self.points_panel.update_point_values(self._convert_point)
+        for graph_id in self.graphs:
+            self.points_panel.update_point_values(
+                graph_id,
+                self._convert_point,
+            )
 
     def open_image(self):
         filename, _ = QFileDialog.getOpenFileName(
@@ -184,7 +248,8 @@ class MainWindow(QMainWindow):
             return
 
         if self.graph_view.load_image(filename):
-            self.points_panel.clear_points()
+            for graph_id in self.graphs:
+                self.points_panel.clear_points(graph_id)
 
     def reset_view(self):
         if self.graph_view.image_item is None:

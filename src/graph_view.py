@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QBrush, QPen, QPixmap
+from PySide6.QtGui import QBrush, QColor, QPen, QPixmap
 from PySide6.QtWidgets import (
     QGraphicsEllipseItem,
     QGraphicsLineItem,
@@ -21,11 +21,9 @@ class GraphView(QGraphicsView):
 
         self.image_item = None
 
-        self.axis_positions = {}
-        self.axis_lines = {}
-
         self.selection_mode = None
-
+        self.graph_layers = {}
+        self.active_graph_id = None
         self.axis_markers = {}
         self.axis_positions = {}
         self.axis_lines = {}
@@ -42,6 +40,59 @@ class GraphView(QGraphicsView):
 
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
 
+    def add_graph(self, graph_id, color=None):
+        self.graph_layers[graph_id] = {
+            "data_points": [],
+            "data_markers": [],
+            "data_lines": [],
+            "visible": True,
+            "color": QColor(color) if color else QColor("#2ecc71"),
+        }
+        if self.active_graph_id is None:
+            self.set_active_graph(graph_id)
+
+    def set_active_graph(self, graph_id):
+        if graph_id not in self.graph_layers:
+            return
+
+        self.active_graph_id = graph_id
+        layer = self.graph_layers[graph_id]
+        self.data_points = layer["data_points"]
+        self.data_markers = layer["data_markers"]
+        self.data_lines = layer["data_lines"]
+        self._bind_layer_visibility(layer)
+
+    def remove_graph(self, graph_id):
+        layer = self.graph_layers.pop(graph_id, None)
+        if layer is None:
+            return
+
+        for item in self._layer_items(layer):
+            self.scene.removeItem(item)
+
+        if self.active_graph_id == graph_id:
+            self.active_graph_id = None
+            if self.graph_layers:
+                self.set_active_graph(next(iter(self.graph_layers)))
+
+    def set_graph_visible(self, graph_id, visible):
+        layer = self.graph_layers.get(graph_id)
+        if layer is None:
+            return
+
+        layer["visible"] = visible
+        self._bind_layer_visibility(layer)
+
+    def _layer_items(self, layer):
+        return (
+            layer["data_markers"]
+            + layer["data_lines"]
+        )
+
+    def _bind_layer_visibility(self, layer):
+        for item in self._layer_items(layer):
+            item.setVisible(layer["visible"])
+
     def load_image(self, filename):
         pixmap = QPixmap(filename)
 
@@ -53,9 +104,14 @@ class GraphView(QGraphicsView):
         self.axis_markers.clear()
         self.axis_positions.clear()
         self.axis_lines.clear()
-        self.data_points.clear()
-        self.data_markers.clear()
-        self.data_lines.clear()
+
+        for layer in self.graph_layers.values():
+            layer["data_points"].clear()
+            layer["data_markers"].clear()
+            layer["data_lines"].clear()
+
+        if self.active_graph_id is not None:
+            self.set_active_graph(self.active_graph_id)
 
         self.image_item = QGraphicsPixmapItem(pixmap)
         self.scene.addItem(self.image_item)
@@ -103,6 +159,9 @@ class GraphView(QGraphicsView):
         self.selection_mode = name
 
     def set_axis_marker(self, name, x, y):
+        if self.active_graph_id is None:
+            return
+
         if name in self.axis_markers:
             self.scene.removeItem(self.axis_markers[name])
 
@@ -188,6 +247,14 @@ class GraphView(QGraphicsView):
         self.data_markers.clear()
         self.data_lines.clear()
 
+    def reset_all_data_points(self):
+        active_graph_id = self.active_graph_id
+        for graph_id in self.graph_layers:
+            self.set_active_graph(graph_id)
+            self.reset_data_points()
+        if active_graph_id is not None:
+            self.set_active_graph(active_graph_id)
+
     def _create_cross(self, x, y, color, size=2):
         pen = QPen(color)
         pen.setWidth(1)
@@ -264,7 +331,8 @@ class GraphView(QGraphicsView):
 
         self.data_points.append((x, y))
 
-        marker = self._create_data_marker(x, y)
+        color = self.graph_layers[self.active_graph_id]["color"]
+        marker = self._create_data_marker(x, y, color)
 
         self.scene.addItem(marker)
         marker.setZValue(20)
@@ -282,7 +350,7 @@ class GraphView(QGraphicsView):
 
             line = QGraphicsLineItem(x1, y1, x, y)
 
-            pen = QPen(Qt.GlobalColor.green)
+            pen = QPen(color)
             pen.setWidth(2)
 
             line.setPen(pen)
@@ -292,7 +360,7 @@ class GraphView(QGraphicsView):
 
             self.data_lines.append(line)
 
-    def _create_data_marker(self, x, y, radius=1):
+    def _create_data_marker(self, x, y, color, radius=1):
         marker = QGraphicsEllipseItem(
             x - radius,
             y - radius,
@@ -300,7 +368,7 @@ class GraphView(QGraphicsView):
             2 * radius,
         )
 
-        marker.setBrush(QBrush(Qt.GlobalColor.green))
-        marker.setPen(QPen(Qt.GlobalColor.green))
+        marker.setBrush(QBrush(color))
+        marker.setPen(QPen(color))
 
         return marker
