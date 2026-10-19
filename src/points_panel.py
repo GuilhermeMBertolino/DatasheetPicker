@@ -66,58 +66,20 @@ class PointsPanel(QWidget):
         if graph_item is not None:
             self.points_tree.setCurrentItem(graph_item)
 
-    def add_point(self, graph_id, number, pixel_x, pixel_y, value_x, value_y):
-        graph_item = self.graph_items[graph_id]
-        point_item = QTreeWidgetItem(
-            graph_item,
-            [
-                f"Point {number}: "
-                f"x={value_x:.6g}, y={value_y:.6g}"
-            ],
-        )
-        point_item.setData(
-            0,
-            Qt.ItemDataRole.UserRole,
-            {
-                "pixel": (pixel_x, pixel_y),
-                "value": (value_x, value_y),
-            },
-        )
-        graph_item.setExpanded(True)
-
-    def clear_points(self, graph_id):
+    def set_points(self, graph_id, points):
         graph_item = self.graph_items[graph_id]
         while graph_item.childCount():
             graph_item.takeChild(0)
 
-    def update_point_values(self, graph_id, value_converter):
-        graph_item = self.graph_items[graph_id]
-        for index in range(graph_item.childCount()):
-            point_item = graph_item.child(index)
-            point_data = point_item.data(0, Qt.ItemDataRole.UserRole)
-            pixel_x, pixel_y = point_data["pixel"]
-            value_x, value_y = value_converter(pixel_x, pixel_y)
-            point_data["value"] = (value_x, value_y)
-            point_item.setData(0, Qt.ItemDataRole.UserRole, point_data)
-            point_item.setText(
-                0,
-                f"Point {index + 1}: "
-                f"x={value_x:.6g}, y={value_y:.6g}",
+        for index, (value_x, value_y) in enumerate(points, start=1):
+            QTreeWidgetItem(
+                graph_item,
+                [
+                    f"Point {index}: "
+                    f"x={value_x:.6g}, y={value_y:.6g}"
+                ],
             )
-
-    def get_points(self, graph_id):
-        graph_item = self.graph_items[graph_id]
-        points = []
-
-        for index in range(graph_item.childCount()):
-            point_item = graph_item.child(index)
-            point_data = point_item.data(0, Qt.ItemDataRole.UserRole)
-            points.append(point_data["value"])
-
-        return points
-
-    def get_graph_name(self, graph_id):
-        return self.graph_items[graph_id].text(0)
+        graph_item.setExpanded(True)
 
     def _add_graph(self):
         graph_id = f"graph-{self.next_graph_number}"

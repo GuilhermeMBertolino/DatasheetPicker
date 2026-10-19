@@ -136,27 +136,6 @@ class AxisPanel(QWidget):
             "Y2": self.y2_value.value(),
         }
 
-    def set_calibration_values(self, values, x_logarithmic, y_logarithmic):
-        controls = (
-            (self.x1_value, values["X1"]),
-            (self.x2_value, values["X2"]),
-            (self.y1_value, values["Y1"]),
-            (self.y2_value, values["Y2"]),
-        )
-
-        for control, value in controls:
-            control.blockSignals(True)
-            control.setValue(value)
-            control.blockSignals(False)
-
-        self.x_logarithmic.blockSignals(True)
-        self.x_logarithmic.setChecked(x_logarithmic)
-        self.x_logarithmic.blockSignals(False)
-
-        self.y_logarithmic.blockSignals(True)
-        self.y_logarithmic.setChecked(y_logarithmic)
-        self.y_logarithmic.blockSignals(False)
-
     def is_x_logarithmic(self):
         return self.x_logarithmic.isChecked()
 
