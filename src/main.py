@@ -78,6 +78,21 @@ class MainWindow(QMainWindow):
         self.axis_panel.mode_points.connect(self.start_points_mode)
         self.axis_panel.mode_calibration.connect(self.start_calibration_mode)
 
+        for spinbox in (
+            self.axis_panel.x1_value,
+            self.axis_panel.x2_value,
+            self.axis_panel.y1_value,
+            self.axis_panel.y2_value,
+        ):
+            spinbox.valueChanged.connect(self.update_calibrated_points)
+
+        self.axis_panel.x_logarithmic.toggled.connect(
+            self.update_calibrated_points
+        )
+        self.axis_panel.y_logarithmic.toggled.connect(
+            self.update_calibrated_points
+        )
+
         self.graph_view.clicked.connect(self.on_graph_clicked)
         self.graph_view.point_added.connect(self.add_point_to_tree)
 
@@ -92,6 +107,8 @@ class MainWindow(QMainWindow):
         )
 
     def on_graph_clicked(self, x, y):
+        self.update_calibrated_points()
+
         if self.selection_index >= len(self.selection_sequence):
             return
 
@@ -127,17 +144,7 @@ class MainWindow(QMainWindow):
         self.graph_view.start_axis_selection("X1")
 
     def add_point_to_tree(self, number, x, y):
-        try:
-            value_x, value_y = pixel_to_data_coordinates(
-                x,
-                y,
-                self.graph_view.axis_positions,
-                self.axis_panel.get_values(),
-                self.axis_panel.is_x_logarithmic(),
-                self.axis_panel.is_y_logarithmic(),
-            )
-        except (KeyError, ValueError):
-            value_x, value_y = x, y
+        value_x, value_y = self._convert_point(x, y)
 
         self.points_panel.add_point(
             number,
@@ -146,6 +153,22 @@ class MainWindow(QMainWindow):
             value_x,
             value_y,
         )
+
+    def _convert_point(self, x, y):
+        try:
+            return pixel_to_data_coordinates(
+                x,
+                y,
+                self.graph_view.axis_positions,
+                self.axis_panel.get_values(),
+                self.axis_panel.is_x_logarithmic(),
+                self.axis_panel.is_y_logarithmic(),
+            )
+        except (KeyError, ValueError):
+            return x, y
+
+    def update_calibrated_points(self, *_args):
+        self.points_panel.update_point_values(self._convert_point)
 
     def open_image(self):
         filename, _ = QFileDialog.getOpenFileName(
@@ -184,8 +207,7 @@ class MainWindow(QMainWindow):
 
         self.graph_view.set_mode("calibration")
         self.axis_panel.set_calibration_mode()
-        self.graph_view.reset_data_points()
-        self.points_panel.clear_points()
+        self.update_calibrated_points()
 
         self.selection_index = 0
         self.axis_panel.set_current_selection("X1")

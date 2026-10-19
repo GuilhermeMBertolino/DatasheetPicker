@@ -31,9 +31,8 @@ class PointsPanel(QWidget):
         point_item = QTreeWidgetItem(
             self.points_root,
             [
-                f"Ponto {number}: "
+                f"Point {number}: "
                 f"x={value_x:.6g}, y={value_y:.6g} "
-                f"(pixel: {pixel_x:.2f}, {pixel_y:.2f})"
             ],
         )
         point_item.setData(
@@ -48,3 +47,18 @@ class PointsPanel(QWidget):
 
     def clear_points(self):
         self.points_root.takeChildren()
+
+    def update_point_values(self, value_converter):
+        for index in range(self.points_root.childCount()):
+            point_item = self.points_root.child(index)
+            point_data = point_item.data(0, Qt.ItemDataRole.UserRole)
+            pixel_x, pixel_y = point_data["pixel"]
+            value_x, value_y = value_converter(pixel_x, pixel_y)
+
+            point_data["value"] = (value_x, value_y)
+            point_item.setData(0, Qt.ItemDataRole.UserRole, point_data)
+            point_item.setText(
+                0,
+                f"Point {index + 1}: "
+                f"x={value_x:.6g}, y={value_y:.6g} "
+            )
