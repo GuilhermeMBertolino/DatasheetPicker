@@ -1,3 +1,4 @@
+import csv
 import sys
 
 from PySide6.QtCore import Qt
@@ -6,6 +7,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QToolBar,
     QWidget,
@@ -72,9 +74,13 @@ class MainWindow(QMainWindow):
         self.open_button = QPushButton("Open Image")
 
         self.reset_view_button = QPushButton("Reset View")
+        self.export_active_button = QPushButton("Export Active Graph")
+        self.export_all_button = QPushButton("Export All Graphs")
 
         toolbar.addWidget(self.open_button)
         toolbar.addWidget(self.reset_view_button)
+        toolbar.addWidget(self.export_active_button)
+        toolbar.addWidget(self.export_all_button)
 
         self.addToolBar(
             Qt.ToolBarArea.TopToolBarArea,
@@ -84,6 +90,8 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         self.open_button.clicked.connect(self.open_image)
         self.reset_view_button.clicked.connect(self.reset_view)
+        self.export_active_button.clicked.connect(self.export_active_graph)
+        self.export_all_button.clicked.connect(self.export_all_graphs)
 
         self.axis_panel.select_point.connect(self.select_axis_point)
         self.axis_panel.reset.connect(self.reset_axis_selection)
@@ -153,6 +161,62 @@ class MainWindow(QMainWindow):
 
     def set_graph_visibility(self, graph_id, visible):
         self.graph_view.set_graph_visible(graph_id, visible)
+
+    def export_active_graph(self):
+        if self.active_graph_id is None:
+            return
+
+        graph_name = self.points_panel.get_graph_name(self.active_graph_id)
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export active graph",
+            f"{graph_name}.csv",
+            "CSV files (*.csv)",
+        )
+
+        if not filename:
+            return
+
+        self._write_csv(
+            filename,
+            ["x", "y"],
+            self.points_panel.get_points(self.active_graph_id),
+        )
+
+    def export_all_graphs(self):
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export all graphs",
+            "graphs.csv",
+            "CSV files (*.csv)",
+        )
+
+        if not filename:
+            return
+
+        rows = []
+        for graph_id in self.graphs:
+            graph_name = self.points_panel.get_graph_name(graph_id)
+            for value_x, value_y in self.points_panel.get_points(graph_id):
+                rows.append([graph_name, value_x, value_y])
+
+        self._write_csv(filename, ["graph", "x", "y"], rows)
+
+    def _write_csv(self, filename, headers, rows):
+        if not filename.lower().endswith(".csv"):
+            filename += ".csv"
+
+        try:
+            with open(filename, "w", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                writer.writerow(headers)
+                writer.writerows(rows)
+        except OSError as error:
+            QMessageBox.critical(
+                self,
+                "Export failed",
+                f"Could not write the CSV file:\n{error}",
+            )
 
 
     def select_axis_point(self, name):

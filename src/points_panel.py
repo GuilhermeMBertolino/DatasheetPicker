@@ -105,6 +105,20 @@ class PointsPanel(QWidget):
                 f"x={value_x:.6g}, y={value_y:.6g}",
             )
 
+    def get_points(self, graph_id):
+        graph_item = self.graph_items[graph_id]
+        points = []
+
+        for index in range(graph_item.childCount()):
+            point_item = graph_item.child(index)
+            point_data = point_item.data(0, Qt.ItemDataRole.UserRole)
+            points.append(point_data["value"])
+
+        return points
+
+    def get_graph_name(self, graph_id):
+        return self.graph_items[graph_id].text(0)
+
     def _add_graph(self):
         graph_id = f"graph-{self.next_graph_number}"
         self.next_graph_number += 1
