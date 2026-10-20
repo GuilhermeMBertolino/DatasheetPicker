@@ -35,7 +35,7 @@ class GraphView(QGraphicsView):
         self.data_markers = []
         self.data_lines = []
 
-        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        self.setDragMode(QGraphicsView.DragMode.NoDrag)
 
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
 
@@ -43,7 +43,7 @@ class GraphView(QGraphicsView):
 
         self.setMouseTracking(True)
         self.viewport().setMouseTracking(True)
-        self.viewport().setCursor(Qt.CursorShape.CrossCursor)
+        self._set_canvas_cursor(Qt.CursorShape.CrossCursor)
 
         self.magnifier_enabled = False
         self.magnifier_size = 180
@@ -64,7 +64,11 @@ class GraphView(QGraphicsView):
         self.magnifier_enabled = enabled
         if not enabled:
             self.magnifier_label.hide()
-            self.viewport().setCursor(Qt.CursorShape.CrossCursor)
+            self._set_canvas_cursor(Qt.CursorShape.CrossCursor)
+
+    def _set_canvas_cursor(self, cursor_shape):
+        self.setCursor(cursor_shape)
+        self.viewport().setCursor(cursor_shape)
 
     def mouseMoveEvent(self, event):
         scene_pos = self.mapToScene(event.position().toPoint())
@@ -75,18 +79,18 @@ class GraphView(QGraphicsView):
             )
         else:
             self.magnifier_label.hide()
-            self.viewport().setCursor(Qt.CursorShape.CrossCursor)
+            self._set_canvas_cursor(Qt.CursorShape.CrossCursor)
 
         super().mouseMoveEvent(event)
         QTimer.singleShot(0, self._restore_cursor)
 
     def leaveEvent(self, event):
         self.magnifier_label.hide()
-        self.viewport().setCursor(Qt.CursorShape.CrossCursor)
+        self._set_canvas_cursor(Qt.CursorShape.CrossCursor)
         super().leaveEvent(event)
 
     def _update_magnifier(self, scene_pos, viewport_pos):
-        self.viewport().setCursor(Qt.CursorShape.BlankCursor)
+        self._set_canvas_cursor(Qt.CursorShape.BlankCursor)
         source_pixmap = self.image_item.pixmap()
         image_pos = self.image_item.mapFromScene(scene_pos)
         source_x = int(image_pos.x())
@@ -256,7 +260,7 @@ class GraphView(QGraphicsView):
         elif self.mode == "points":
             self._handle_point_click(scene_pos)
             if self.magnifier_enabled:
-                self.viewport().setCursor(Qt.CursorShape.BlankCursor)
+                self._set_canvas_cursor(Qt.CursorShape.BlankCursor)
             else:
                 QTimer.singleShot(0, self._restore_cursor)
             return
@@ -266,7 +270,7 @@ class GraphView(QGraphicsView):
 
     def _restore_cursor(self):
         if not self.magnifier_enabled:
-            self.viewport().setCursor(Qt.CursorShape.CrossCursor)
+            self._set_canvas_cursor(Qt.CursorShape.CrossCursor)
 
     def start_axis_selection(self, name):
         self.selection_mode = name
