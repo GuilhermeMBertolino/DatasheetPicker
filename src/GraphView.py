@@ -47,6 +47,9 @@ class GraphView(QGraphicsView):
 
         self.magnifier_enabled = False
         self.magnifier_size = 180
+        self.magnifier_zoom = 4.0
+        self.last_scene_pos = None
+        self.last_viewport_pos = None
         self.magnifier_label = QLabel(self.viewport())
         self.magnifier_label.setFixedSize(
             self.magnifier_size,
@@ -71,18 +74,30 @@ class GraphView(QGraphicsView):
         self.viewport().setCursor(cursor_shape)
 
     def mouseMoveEvent(self, event):
-        scene_pos = self.mapToScene(event.position().toPoint())
-        if self.magnifier_enabled and self._inside_image(scene_pos):
-            self._update_magnifier(
-                scene_pos,
-                event.position().toPoint(),
-            )
-        else:
-            self.magnifier_label.hide()
-            self._set_canvas_cursor(Qt.CursorShape.CrossCursor)
+        viewport_pos = event.position().toPoint()
+        self.last_viewport_pos = viewport_pos
+        self.last_scene_pos = self.mapToScene(viewport_pos)
+        self._refresh_magnifier()
 
         super().mouseMoveEvent(event)
         QTimer.singleShot(0, self._restore_cursor)
+
+    def _refresh_magnifier(self):
+        if (
+            not self.magnifier_enabled
+            or self.last_scene_pos is None
+            or self.last_viewport_pos is None
+            or not self._inside_image(self.last_scene_pos)
+        ):
+            self.magnifier_label.hide()
+            if not self.magnifier_enabled:
+                self._set_canvas_cursor(Qt.CursorShape.CrossCursor)
+            return
+
+        self._update_magnifier(
+            self.last_scene_pos,
+            self.last_viewport_pos,
+        )
 
     def leaveEvent(self, event):
         self.magnifier_label.hide()
@@ -91,7 +106,7 @@ class GraphView(QGraphicsView):
 
     def _update_magnifier(self, scene_pos, viewport_pos):
         self._set_canvas_cursor(Qt.CursorShape.BlankCursor)
-        source_radius = 25
+        source_radius = self._magnifier_source_radius()
         source_rect = QRectF(
             scene_pos.x() - source_radius,
             scene_pos.y() - source_radius,
@@ -119,6 +134,13 @@ class GraphView(QGraphicsView):
         self.magnifier_label.setPixmap(display)
         self._move_magnifier(viewport_pos)
         self.magnifier_label.show()
+
+    def _magnifier_source_radius(self):
+        current_zoom = abs(self.transform().m11())
+        current_zoom = max(current_zoom, 0.01)
+        return (self.magnifier_size - 8) / (
+            2 * current_zoom * self.magnifier_zoom
+        )
 
     def _move_magnifier(self, cursor_pos):
         viewport_rect = self.viewport().rect()
@@ -225,11 +247,16 @@ class GraphView(QGraphicsView):
 
     def wheelEvent(self, event):
         zoom_factor = 1.15
+        viewport_pos = event.position().toPoint()
+        self.last_viewport_pos = viewport_pos
 
         if event.angleDelta().y() > 0:
             self.scale(zoom_factor, zoom_factor)
         else:
             self.scale(1 / zoom_factor, 1 / zoom_factor)
+
+        self.last_scene_pos = self.mapToScene(viewport_pos)
+        self._refresh_magnifier()
 
     def mousePressEvent(self, event):
         if event.button() != Qt.MouseButton.LeftButton:
@@ -238,6 +265,8 @@ class GraphView(QGraphicsView):
             return
 
         scene_pos = self.mapToScene(event.position().toPoint())
+        self.last_viewport_pos = event.position().toPoint()
+        self.last_scene_pos = scene_pos
 
         if not self._inside_image(scene_pos):
             super().mousePressEvent(event)
@@ -480,6 +509,8 @@ class GraphView(QGraphicsView):
             self.scene.addItem(line)
 
             self.data_lines.append(line)
+
+        self._refresh_magnifier()
 
     def _create_data_marker(self, x, y, color, radius=1):
         marker = QGraphicsEllipseItem(
