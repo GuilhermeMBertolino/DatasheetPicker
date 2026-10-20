@@ -1,4 +1,4 @@
-from PySide6.QtCore import QPoint, QRect, QTimer, Qt, Signal
+from PySide6.QtCore import QPoint, QRectF, QTimer, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QGraphicsEllipseItem,
@@ -91,34 +91,24 @@ class GraphView(QGraphicsView):
 
     def _update_magnifier(self, scene_pos, viewport_pos):
         self._set_canvas_cursor(Qt.CursorShape.BlankCursor)
-        source_pixmap = self.image_item.pixmap()
-        image_pos = self.image_item.mapFromScene(scene_pos)
-        source_x = int(image_pos.x())
-        source_y = int(image_pos.y())
         source_radius = 25
-        source_rect = QRect(
-            source_x - source_radius,
-            source_y - source_radius,
+        source_rect = QRectF(
+            scene_pos.x() - source_radius,
+            scene_pos.y() - source_radius,
             source_radius * 2,
             source_radius * 2,
-        ).intersected(source_pixmap.rect())
-
-        if source_rect.isEmpty():
-            self.magnifier_label.hide()
-            return
-
-        zoomed = source_pixmap.copy(source_rect).scaled(
-            self.magnifier_size - 8,
-            self.magnifier_size - 8,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.FastTransformation,
         )
+
         display = QPixmap(self.magnifier_label.size())
         display.fill(Qt.GlobalColor.white)
         painter = QPainter(display)
-        offset_x = (display.width() - zoomed.width()) // 2
-        offset_y = (display.height() - zoomed.height()) // 2
-        painter.drawPixmap(offset_x, offset_y, zoomed)
+        target_rect = QRectF(
+            4,
+            4,
+            self.magnifier_size - 8,
+            self.magnifier_size - 8,
+        )
+        self.scene.render(painter, target_rect, source_rect)
         painter.setPen(QPen(Qt.GlobalColor.red, 1))
         center_x = display.width() // 2
         center_y = display.height() // 2
