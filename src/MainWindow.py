@@ -141,6 +141,7 @@ class MainWindow(QMainWindow):
         self.graph_view.clicked.connect(self.on_graph_clicked)
         self.graph_view.point_added.connect(self.add_point)
         self.graph_view.point_moved.connect(self.move_point)
+        self.graph_view.axis_moved.connect(self.update_calibrated_points)
         self.points_panel.graph_added.connect(self.add_graph)
         self.points_panel.graph_selected.connect(self.select_graph)
         self.points_panel.graph_removed.connect(self.remove_graph)

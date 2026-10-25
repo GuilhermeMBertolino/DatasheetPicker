@@ -16,6 +16,7 @@ class GraphView(QGraphicsView):
     clicked = Signal(float, float)
     point_added = Signal(int, float, float)
     point_moved = Signal(int, float, float)
+    axis_moved = Signal(str, float, float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -38,6 +39,7 @@ class GraphView(QGraphicsView):
         self.data_markers = []
         self.data_lines = []
         self.dragging_point_index = None
+        self.dragging_axis_name = None
 
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
 
@@ -71,17 +73,49 @@ class GraphView(QGraphicsView):
         self.magnifier_enabled = enabled
         if not enabled:
             self.magnifier_label.hide()
-            self._set_canvas_cursor(Qt.CursorShape.CrossCursor)
+        self._update_cursor_for_position(self.last_scene_pos)
 
     def _set_canvas_cursor(self, cursor_shape):
         self.setCursor(cursor_shape)
         self.viewport().setCursor(cursor_shape)
 
+    def _update_cursor_for_position(self, scene_pos):
+        if scene_pos is None or not self._inside_image(scene_pos):
+            self._set_canvas_cursor(Qt.CursorShape.CrossCursor)
+            return
+
+        if self.mode == "calibration":
+            over_axis = self._find_axis_name(scene_pos) is not None
+        else:
+            over_axis = False
+        over_point = (
+            self.mode == "points"
+            and self._find_point_index(scene_pos) is not None
+        )
+
+        if self.dragging_axis_name is not None:
+            cursor_shape = Qt.CursorShape.ClosedHandCursor
+        elif self.dragging_point_index is not None and over_point:
+            cursor_shape = Qt.CursorShape.ClosedHandCursor
+        elif over_axis or over_point:
+            cursor_shape = Qt.CursorShape.PointingHandCursor
+        elif self.magnifier_enabled:
+            cursor_shape = Qt.CursorShape.BlankCursor
+        else:
+            cursor_shape = Qt.CursorShape.CrossCursor
+        self._set_canvas_cursor(cursor_shape)
+
     def mouseMoveEvent(self, event):
         viewport_pos = event.position().toPoint()
         self.last_viewport_pos = viewport_pos
         self.last_scene_pos = self.mapToScene(viewport_pos)
-        if self.dragging_point_index is not None:
+        if self.dragging_axis_name is not None:
+            self._move_axis_marker(
+                self.dragging_axis_name,
+                self.last_scene_pos.x(),
+                self.last_scene_pos.y(),
+            )
+        elif self.dragging_point_index is not None:
             self._move_data_point(
                 self.dragging_point_index,
                 self.last_scene_pos.x(),
@@ -101,8 +135,7 @@ class GraphView(QGraphicsView):
             or not self._inside_image(self.last_scene_pos)
         ):
             self.magnifier_label.hide()
-            if not self.magnifier_enabled:
-                self._set_canvas_cursor(Qt.CursorShape.CrossCursor)
+            self._update_cursor_for_position(self.last_scene_pos)
             return
 
         self._update_magnifier(
@@ -116,7 +149,7 @@ class GraphView(QGraphicsView):
         super().leaveEvent(event)
 
     def _update_magnifier(self, scene_pos, viewport_pos):
-        self._set_canvas_cursor(Qt.CursorShape.BlankCursor)
+        self._update_cursor_for_position(scene_pos)
         source_radius = self._magnifier_source_radius()
         source_rect = QRectF(
             scene_pos.x() - source_radius,
@@ -285,6 +318,16 @@ class GraphView(QGraphicsView):
             return
 
         if self.mode == "calibration":
+            axis_name = self._find_axis_name(scene_pos)
+            if axis_name is not None:
+                self.dragging_axis_name = axis_name
+                self._move_axis_marker(
+                    axis_name,
+                    scene_pos.x(),
+                    scene_pos.y(),
+                )
+                self._set_canvas_cursor(Qt.CursorShape.ClosedHandCursor)
+                return
             self._handle_calibration_click(scene_pos)
 
         elif self.mode == "points":
@@ -298,10 +341,7 @@ class GraphView(QGraphicsView):
                 )
                 return
             self._handle_point_click(scene_pos)
-            if self.magnifier_enabled:
-                self._set_canvas_cursor(Qt.CursorShape.BlankCursor)
-            else:
-                QTimer.singleShot(0, self._restore_cursor)
+            QTimer.singleShot(0, self._restore_cursor)
             return
 
         super().mousePressEvent(event)
@@ -309,12 +349,12 @@ class GraphView(QGraphicsView):
 
     def mouseReleaseEvent(self, event):
         self.dragging_point_index = None
+        self.dragging_axis_name = None
         super().mouseReleaseEvent(event)
         QTimer.singleShot(0, self._restore_cursor)
 
     def _restore_cursor(self):
-        if not self.magnifier_enabled:
-            self._set_canvas_cursor(Qt.CursorShape.CrossCursor)
+        self._update_cursor_for_position(self.last_scene_pos)
 
     def _find_point_index(self, scene_pos):
         if not self.data_points:
@@ -332,6 +372,27 @@ class GraphView(QGraphicsView):
                 closest_index = index
                 closest_distance = distance
         return closest_index
+
+    def _find_axis_name(self, scene_pos):
+        if not self.axis_positions:
+            return None
+
+        threshold = 8 / max(abs(self.transform().m11()), 0.01)
+        closest_name = None
+        closest_distance = threshold
+        for name, (point_x, point_y) in self.axis_positions.items():
+            distance = math.hypot(
+                scene_pos.x() - point_x,
+                scene_pos.y() - point_y,
+            )
+            if distance <= closest_distance:
+                closest_name = name
+                closest_distance = distance
+        return closest_name
+
+    def _move_axis_marker(self, name, x, y):
+        self.set_axis_marker(name, x, y)
+        self.axis_moved.emit(name, x, y)
 
     def _move_data_point(self, index, x, y):
         self.data_points[index] = (x, y)
