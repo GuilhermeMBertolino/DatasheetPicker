@@ -3,6 +3,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QColorDialog,
     QHBoxLayout,
+    QHeaderView,
     QPushButton,
     QTabWidget,
     QTreeWidget,
@@ -32,14 +33,10 @@ class PointsTree(QTreeWidget):
             event.ignore()
             return
 
-        graph_id = (
-            graph_item.data(0, Qt.ItemDataRole.UserRole)
-            if graph_item else None
-        )
-
+        graph_id = graph_item.data(2, Qt.ItemDataRole.UserRole)
         super().dropEvent(event)
 
-        if graph_item is None or dragged_item.parent() is not graph_item:
+        if dragged_item.parent() is not graph_item:
             return
 
         order = [
@@ -68,8 +65,17 @@ class PointsPanel(QWidget):
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
         self.points_tree = PointsTree()
-        self.points_tree.setColumnCount(2)
-        self.points_tree.setHeaderLabels(["Color", "Graphs and points"])
+        self.points_tree.setColumnCount(3)
+        self.points_tree.setHeaderLabels(["", "Color", "Graphs and points"])
+        self.points_tree.header().setSectionResizeMode(
+            0,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        self.points_tree.header().setSectionResizeMode(
+            1,
+            QHeaderView.ResizeMode.ResizeToContents,
+        )
+        self.points_tree.header().setStretchLastSection(True)
         self.points_tree.setRootIsDecorated(True)
         self.points_tree.setDragDropMode(QTreeWidget.DragDropMode.InternalMove)
         self.tabs.addTab(self.points_tree, "Points")
@@ -92,8 +98,11 @@ class PointsPanel(QWidget):
         self.points_tree.points_reordered.connect(self.points_reordered)
 
     def add_graph(self, graph_id, name, color):
-        graph_item = QTreeWidgetItem(self.points_tree, ["", name])
-        graph_item.setData(0, Qt.ItemDataRole.UserRole, graph_id)
+        graph_item = QTreeWidgetItem(
+            self.points_tree,
+            ["", "", name],
+        )
+        graph_item.setData(2, Qt.ItemDataRole.UserRole, graph_id)
         graph_item.setFlags(
             graph_item.flags()
             | Qt.ItemFlag.ItemIsUserCheckable
@@ -103,15 +112,16 @@ class PointsPanel(QWidget):
         graph_item.setCheckState(0, Qt.CheckState.Checked)
         graph_item.setExpanded(True)
         self.graph_items[graph_id] = graph_item
+
         color_button = QPushButton()
-        color_button.setFixedSize(24, 18)
+        color_button.setFixedSize(18, 14)
         color_button.setCursor(Qt.CursorShape.PointingHandCursor)
         color_button.clicked.connect(
             lambda: self._choose_graph_color(graph_id)
         )
         self.color_buttons[graph_id] = color_button
         self._set_color_button(color_button, color)
-        self.points_tree.setItemWidget(graph_item, 0, color_button)
+        self.points_tree.setItemWidget(graph_item, 1, color_button)
         self.points_tree.setCurrentItem(graph_item)
 
     def remove_graph(self, graph_id):
@@ -137,8 +147,8 @@ class PointsPanel(QWidget):
                 graph_item,
                 [
                     "",
-                    f"Point {index}: "
-                    f"x={value_x:.6g}, y={value_y:.6g}"
+                    "",
+                    f"Point {index}: x={value_x:.6g}, y={value_y:.6g}",
                 ],
             )
             point_item.setFlags(
@@ -152,12 +162,10 @@ class PointsPanel(QWidget):
         graph_item.setExpanded(True)
 
     def update_point(self, graph_id, index, value_x, value_y):
-        graph_item = self.graph_items[graph_id]
-        point_item = graph_item.child(index)
+        point_item = self.graph_items[graph_id].child(index)
         point_item.setText(
-            1,
-            f"Point {index + 1}: "
-            f"x={value_x:.6g}, y={value_y:.6g}",
+            2,
+            f"Point {index + 1}: x={value_x:.6g}, y={value_y:.6g}",
         )
 
     def refresh_point_indices(self, graph_id):
@@ -170,7 +178,7 @@ class PointsPanel(QWidget):
             )
 
     def set_graph_name(self, graph_id, name):
-        self.graph_items[graph_id].setText(1, name)
+        self.graph_items[graph_id].setText(2, name)
 
     def _set_color_button(self, button, color):
         button.setProperty("color", color)
@@ -201,38 +209,34 @@ class PointsPanel(QWidget):
         graph_item = self.points_tree.currentItem()
         if graph_item is None:
             return
-
         if graph_item.parent() is not None:
             graph_item = graph_item.parent()
-
-        graph_id = graph_item.data(0, Qt.ItemDataRole.UserRole)
+        graph_id = graph_item.data(2, Qt.ItemDataRole.UserRole)
         self.graph_removed.emit(graph_id)
 
     def _remove_selected_point(self):
         point_item = self.points_tree.currentItem()
         if point_item is None or point_item.parent() is None:
             return
-
         graph_item = point_item.parent()
-        graph_id = graph_item.data(0, Qt.ItemDataRole.UserRole)
+        graph_id = graph_item.data(2, Qt.ItemDataRole.UserRole)
         point_index = point_item.data(0, Qt.ItemDataRole.UserRole)
         self.point_removed.emit(graph_id, point_index)
 
     def _handle_item_clicked(self, item, _column):
         if item.parent() is not None:
             return
-
-        graph_id = item.data(0, Qt.ItemDataRole.UserRole)
+        graph_id = item.data(2, Qt.ItemDataRole.UserRole)
         if graph_id in self.graph_items:
             self.graph_selected.emit(graph_id)
 
-    def _handle_item_changed(self, item, _column):
+    def _handle_item_changed(self, item, column):
         if item.parent() is not None:
             return
-        graph_id = item.data(0, Qt.ItemDataRole.UserRole)
-        if graph_id in self.graph_items:
-            if _column == 1:
-                self.graph_renamed.emit(graph_id, item.text(1).strip())
-                return
-            visible = item.checkState(0) == Qt.CheckState.Checked
-            self.graph_visibility_changed.emit(graph_id, visible)
+        graph_id = item.data(2, Qt.ItemDataRole.UserRole)
+        if graph_id not in self.graph_items:
+            return
+        if column == 2:
+            self.graph_renamed.emit(graph_id, item.text(2).strip())
+        visible = item.checkState(0) == Qt.CheckState.Checked
+        self.graph_visibility_changed.emit(graph_id, visible)
