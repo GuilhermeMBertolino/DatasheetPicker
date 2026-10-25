@@ -140,9 +140,12 @@ class MainWindow(QMainWindow):
 
         self.graph_view.clicked.connect(self.on_graph_clicked)
         self.graph_view.point_added.connect(self.add_point)
+        self.graph_view.point_moved.connect(self.move_point)
         self.points_panel.graph_added.connect(self.add_graph)
         self.points_panel.graph_selected.connect(self.select_graph)
         self.points_panel.graph_removed.connect(self.remove_graph)
+        self.points_panel.point_removed.connect(self.remove_point)
+        self.points_panel.points_reordered.connect(self.reorder_points)
         self.points_panel.graph_visibility_changed.connect(
             self.set_graph_visibility
         )
@@ -238,6 +241,63 @@ class MainWindow(QMainWindow):
         graph = self.graphs.get(self.active_graph_id)
         graph.points.append(DataPoint(pixel_x, pixel_y, value_x, value_y))
         self._refresh_graph(graph)
+
+    def move_point(self, index, pixel_x, pixel_y):
+        if self.active_graph_id is None:
+            return
+
+        graph = self.graphs.get(self.active_graph_id)
+        if index >= len(graph.points):
+            return
+
+        value_x, value_y = self._convert_point(pixel_x, pixel_y)
+        point = graph.points[index]
+        point.pixel_x = pixel_x
+        point.pixel_y = pixel_y
+        point.value_x = value_x
+        point.value_y = value_y
+        self.points_panel.update_point(
+            graph.graph_id,
+            index,
+            value_x,
+            value_y,
+        )
+
+    def remove_point(self, graph_id, index):
+        if graph_id not in self.graphs:
+            return
+
+        graph = self.graphs.get(graph_id)
+        if index < 0 or index >= len(graph.points):
+            return
+
+        graph.points.pop(index)
+        previous_graph_id = self.active_graph_id
+        if graph_id != previous_graph_id:
+            self.graph_view.set_active_graph(graph_id)
+        if graph_id == self.graph_view.active_graph_id:
+            self.graph_view.remove_data_point(index)
+        if graph_id != previous_graph_id:
+            self.graph_view.set_active_graph(previous_graph_id)
+        self._refresh_graph(graph)
+
+    def reorder_points(self, graph_id, order):
+        if graph_id not in self.graphs:
+            return
+
+        graph = self.graphs.get(graph_id)
+        if sorted(order) != list(range(len(graph.points))):
+            return
+
+        graph.points[:] = [graph.points[index] for index in order]
+        previous_graph_id = self.active_graph_id
+        if graph_id != previous_graph_id:
+            self.graph_view.set_active_graph(graph_id)
+        if graph_id == self.graph_view.active_graph_id:
+            self.graph_view.reorder_data_points(order)
+        if graph_id != previous_graph_id:
+            self.graph_view.set_active_graph(previous_graph_id)
+        self.points_panel.refresh_point_indices(graph_id)
 
     def interpolate_active_graph(self):
         if self.active_graph_id is None:

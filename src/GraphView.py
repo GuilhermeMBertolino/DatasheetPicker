@@ -1,3 +1,5 @@
+import math
+
 from PySide6.QtCore import QPoint, QRectF, QTimer, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
@@ -13,6 +15,7 @@ from PySide6.QtWidgets import (
 class GraphView(QGraphicsView):
     clicked = Signal(float, float)
     point_added = Signal(int, float, float)
+    point_moved = Signal(int, float, float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -34,6 +37,7 @@ class GraphView(QGraphicsView):
         self.data_points = []
         self.data_markers = []
         self.data_lines = []
+        self.dragging_point_index = None
 
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
 
@@ -77,7 +81,14 @@ class GraphView(QGraphicsView):
         viewport_pos = event.position().toPoint()
         self.last_viewport_pos = viewport_pos
         self.last_scene_pos = self.mapToScene(viewport_pos)
-        self._refresh_magnifier()
+        if self.dragging_point_index is not None:
+            self._move_data_point(
+                self.dragging_point_index,
+                self.last_scene_pos.x(),
+                self.last_scene_pos.y(),
+            )
+        else:
+            self._refresh_magnifier()
 
         super().mouseMoveEvent(event)
         QTimer.singleShot(0, self._restore_cursor)
@@ -277,6 +288,15 @@ class GraphView(QGraphicsView):
             self._handle_calibration_click(scene_pos)
 
         elif self.mode == "points":
+            point_index = self._find_point_index(scene_pos)
+            if point_index is not None:
+                self.dragging_point_index = point_index
+                self._move_data_point(
+                    point_index,
+                    scene_pos.x(),
+                    scene_pos.y(),
+                )
+                return
             self._handle_point_click(scene_pos)
             if self.magnifier_enabled:
                 self._set_canvas_cursor(Qt.CursorShape.BlankCursor)
@@ -287,9 +307,62 @@ class GraphView(QGraphicsView):
         super().mousePressEvent(event)
         QTimer.singleShot(0, self._restore_cursor)
 
+    def mouseReleaseEvent(self, event):
+        self.dragging_point_index = None
+        super().mouseReleaseEvent(event)
+        QTimer.singleShot(0, self._restore_cursor)
+
     def _restore_cursor(self):
         if not self.magnifier_enabled:
             self._set_canvas_cursor(Qt.CursorShape.CrossCursor)
+
+    def _find_point_index(self, scene_pos):
+        if not self.data_points:
+            return None
+
+        threshold = 8 / max(abs(self.transform().m11()), 0.01)
+        closest_index = None
+        closest_distance = threshold
+        for index, (point_x, point_y) in enumerate(self.data_points):
+            distance = math.hypot(
+                scene_pos.x() - point_x,
+                scene_pos.y() - point_y,
+            )
+            if distance <= closest_distance:
+                closest_index = index
+                closest_distance = distance
+        return closest_index
+
+    def _move_data_point(self, index, x, y):
+        self.data_points[index] = (x, y)
+        marker = self.data_markers[index]
+        rect = marker.rect()
+        marker.setRect(
+            x - rect.width() / 2,
+            y - rect.height() / 2,
+            rect.width(),
+            rect.height(),
+        )
+        self._rebuild_data_lines()
+        self.point_moved.emit(index, x, y)
+        self._refresh_magnifier()
+
+    def _rebuild_data_lines(self):
+        for line in self.data_lines:
+            self.scene.removeItem(line)
+        self.data_lines.clear()
+
+        color = self.graph_layers[self.active_graph_id]["color"]
+        for index in range(1, len(self.data_points)):
+            x1, y1 = self.data_points[index - 1]
+            x2, y2 = self.data_points[index]
+            line = QGraphicsLineItem(x1, y1, x2, y2)
+            pen = QPen(color)
+            pen.setWidth(2)
+            line.setPen(pen)
+            line.setZValue(15)
+            self.scene.addItem(line)
+            self.data_lines.append(line)
 
     def start_axis_selection(self, name):
         self.selection_mode = name
@@ -403,6 +476,27 @@ class GraphView(QGraphicsView):
             line = self.data_lines.pop()
             self.scene.removeItem(line)
 
+        return True
+
+    def remove_data_point(self, index):
+        if index < 0 or index >= len(self.data_points):
+            return False
+
+        marker = self.data_markers.pop(index)
+        self.scene.removeItem(marker)
+        self.data_points.pop(index)
+        self._rebuild_data_lines()
+        self._refresh_magnifier()
+        return True
+
+    def reorder_data_points(self, order):
+        if sorted(order) != list(range(len(self.data_points))):
+            return False
+
+        self.data_points[:] = [self.data_points[index] for index in order]
+        self.data_markers[:] = [self.data_markers[index] for index in order]
+        self._rebuild_data_lines()
+        self._refresh_magnifier()
         return True
 
     def _create_cross(self, x, y, color, size=2):

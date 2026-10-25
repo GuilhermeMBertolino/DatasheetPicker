@@ -27,3 +27,9 @@ After selecting at least two points in a graph, click `Interpolate`. Enter the
 start value `x0`, the end value `xf`, and the total number of points. The app
 creates a new graph with values interpolated linearly between the selected
 points.
+
+## Point editing
+
+In points mode, drag a point directly on the graph to move it. Select a point
+in the tree and click `Remove point` to delete it. Points can also be dragged
+inside their graph in the tree to change their order in the curve.
