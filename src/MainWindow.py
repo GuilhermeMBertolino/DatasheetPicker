@@ -47,7 +47,7 @@ class MainWindow(QMainWindow):
 
         graph = self.graphs.add("Graph 1", self.graph_colors[0])
         self.graph_view.add_graph(graph.graph_id, graph.color)
-        self.points_panel.add_graph(graph.graph_id, graph.name)
+        self.points_panel.add_graph(graph.graph_id, graph.name, graph.color)
         self._activate_graph(graph.graph_id)
         self.axis_panel.set_current_selection("X1")
         self.graph_view.start_axis_selection("X1")
@@ -150,6 +150,8 @@ class MainWindow(QMainWindow):
         self.points_panel.graph_visibility_changed.connect(
             self.set_graph_visibility
         )
+        self.points_panel.graph_color_changed.connect(self.set_graph_color)
+        self.points_panel.graph_renamed.connect(self.rename_graph)
 
     def _create_export_menu(self, export_all):
         menu = QMenu(self)
@@ -181,7 +183,7 @@ class MainWindow(QMainWindow):
     def _create_graph(self, name, color):
         graph = self.graphs.add(name, color)
         self.graph_view.add_graph(graph.graph_id, graph.color)
-        self.points_panel.add_graph(graph.graph_id, graph.name)
+        self.points_panel.add_graph(graph.graph_id, graph.name, graph.color)
         return graph
 
     def add_graph(self, _graph_id=None):
@@ -212,6 +214,18 @@ class MainWindow(QMainWindow):
         graph = self.graphs.get(graph_id)
         graph.visible = visible
         self.graph_view.set_graph_visible(graph_id, visible)
+
+    def set_graph_color(self, graph_id, color):
+        graph = self.graphs.get(graph_id)
+        graph.color = color
+        self.graph_view.set_graph_color(graph_id, color)
+
+    def rename_graph(self, graph_id, name):
+        graph = self.graphs.get(graph_id)
+        if not name:
+            self.points_panel.set_graph_name(graph_id, graph.name)
+            return
+        graph.name = name
 
     def toggle_magnifier(self):
         self.magnifier_button.setChecked(

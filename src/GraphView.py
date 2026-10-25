@@ -245,6 +245,21 @@ class GraphView(QGraphicsView):
         layer["visible"] = visible
         self._bind_layer_visibility(layer)
 
+    def set_graph_color(self, graph_id, color):
+        layer = self.graph_layers.get(graph_id)
+        if layer is None:
+            return
+
+        layer["color"] = QColor(color)
+        for marker in layer["data_markers"]:
+            marker.setBrush(QBrush(layer["color"]))
+            marker.setPen(QPen(layer["color"]))
+        for line in layer["data_lines"]:
+            pen = QPen(layer["color"])
+            pen.setWidth(2)
+            line.setPen(pen)
+        self._refresh_magnifier()
+
     def _layer_items(self, layer):
         return (
             layer["data_markers"]

@@ -1,5 +1,7 @@
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QColorDialog,
     QHBoxLayout,
     QPushButton,
     QTabWidget,
@@ -54,16 +56,20 @@ class PointsPanel(QWidget):
     graph_visibility_changed = Signal(str, bool)
     point_removed = Signal(str, int)
     points_reordered = Signal(str, list)
+    graph_color_changed = Signal(str, str)
+    graph_renamed = Signal(str, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.graph_items = {}
+        self.color_buttons = {}
         self.next_graph_number = 2
 
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
         self.points_tree = PointsTree()
-        self.points_tree.setHeaderLabels(["Graphs and points"])
+        self.points_tree.setColumnCount(2)
+        self.points_tree.setHeaderLabels(["Color", "Graphs and points"])
         self.points_tree.setRootIsDecorated(True)
         self.points_tree.setDragDropMode(QTreeWidget.DragDropMode.InternalMove)
         self.tabs.addTab(self.points_tree, "Points")
@@ -85,17 +91,27 @@ class PointsPanel(QWidget):
         self.points_tree.itemChanged.connect(self._handle_item_changed)
         self.points_tree.points_reordered.connect(self.points_reordered)
 
-    def add_graph(self, graph_id, name):
-        graph_item = QTreeWidgetItem(self.points_tree, [name])
+    def add_graph(self, graph_id, name, color):
+        graph_item = QTreeWidgetItem(self.points_tree, ["", name])
         graph_item.setData(0, Qt.ItemDataRole.UserRole, graph_id)
         graph_item.setFlags(
             graph_item.flags()
             | Qt.ItemFlag.ItemIsUserCheckable
             | Qt.ItemFlag.ItemIsSelectable
+            | Qt.ItemFlag.ItemIsEditable
         )
         graph_item.setCheckState(0, Qt.CheckState.Checked)
         graph_item.setExpanded(True)
         self.graph_items[graph_id] = graph_item
+        color_button = QPushButton()
+        color_button.setFixedSize(24, 18)
+        color_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        color_button.clicked.connect(
+            lambda: self._choose_graph_color(graph_id)
+        )
+        self.color_buttons[graph_id] = color_button
+        self._set_color_button(color_button, color)
+        self.points_tree.setItemWidget(graph_item, 0, color_button)
         self.points_tree.setCurrentItem(graph_item)
 
     def remove_graph(self, graph_id):
@@ -104,6 +120,7 @@ class PointsPanel(QWidget):
             return
         index = self.points_tree.indexOfTopLevelItem(graph_item)
         self.points_tree.takeTopLevelItem(index)
+        self.color_buttons.pop(graph_id, None)
 
     def set_active_graph(self, graph_id):
         graph_item = self.graph_items.get(graph_id)
@@ -119,6 +136,7 @@ class PointsPanel(QWidget):
             point_item = QTreeWidgetItem(
                 graph_item,
                 [
+                    "",
                     f"Point {index}: "
                     f"x={value_x:.6g}, y={value_y:.6g}"
                 ],
@@ -137,7 +155,7 @@ class PointsPanel(QWidget):
         graph_item = self.graph_items[graph_id]
         point_item = graph_item.child(index)
         point_item.setText(
-            0,
+            1,
             f"Point {index + 1}: "
             f"x={value_x:.6g}, y={value_y:.6g}",
         )
@@ -150,6 +168,29 @@ class PointsPanel(QWidget):
                 Qt.ItemDataRole.UserRole,
                 index,
             )
+
+    def set_graph_name(self, graph_id, name):
+        self.graph_items[graph_id].setText(1, name)
+
+    def _set_color_button(self, button, color):
+        button.setProperty("color", color)
+        button.setStyleSheet(
+            f"background-color: {color}; border: 1px solid #333;"
+        )
+
+    def _choose_graph_color(self, graph_id):
+        button = self.color_buttons[graph_id]
+        color = QColorDialog.getColor(
+            QColor(button.property("color")),
+            self,
+            "Select graph color",
+        )
+        if not color.isValid():
+            return
+
+        color_name = color.name()
+        self._set_color_button(button, color_name)
+        self.graph_color_changed.emit(graph_id, color_name)
 
     def _add_graph(self):
         graph_id = f"graph-{self.next_graph_number}"
@@ -190,5 +231,8 @@ class PointsPanel(QWidget):
             return
         graph_id = item.data(0, Qt.ItemDataRole.UserRole)
         if graph_id in self.graph_items:
+            if _column == 1:
+                self.graph_renamed.emit(graph_id, item.text(1).strip())
+                return
             visible = item.checkState(0) == Qt.CheckState.Checked
             self.graph_visibility_changed.emit(graph_id, visible)
