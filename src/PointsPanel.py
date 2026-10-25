@@ -16,6 +16,22 @@ from PySide6.QtWidgets import (
 class PointsTree(QTreeWidget):
     points_reordered = Signal(str, list)
 
+    def mouseMoveEvent(self, event):
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            super().mouseMoveEvent(event)
+            return
+
+        previous_current = self.currentItem()
+        previous_selected = list(self.selectedItems())
+        super().mouseMoveEvent(event)
+
+        self.blockSignals(True)
+        self.clearSelection()
+        for item in previous_selected:
+            item.setSelected(True)
+        self.setCurrentItem(previous_current)
+        self.blockSignals(False)
+
     def dropEvent(self, event):
         dragged_item = self.currentItem()
         if dragged_item is None or dragged_item.parent() is None:
