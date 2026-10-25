@@ -479,6 +479,17 @@ class GraphView(QGraphicsView):
         x = scene_pos.x()
         y = scene_pos.y()
 
+        self.add_data_point(x, y)
+
+        self.point_added.emit(
+            len(self.data_points),
+            x,
+            y,
+        )
+
+    def add_data_point(self, x, y):
+        """Add a point programmatically without emitting a click signal."""
+
         self.data_points.append((x, y))
 
         color = self.graph_layers[self.active_graph_id]["color"]
@@ -488,12 +499,6 @@ class GraphView(QGraphicsView):
         marker.setZValue(20)
 
         self.data_markers.append(marker)
-
-        self.point_added.emit(
-            len(self.data_points),
-            x,
-            y,
-        )
 
         if len(self.data_points) >= 2:
             x1, y1 = self.data_points[-2]

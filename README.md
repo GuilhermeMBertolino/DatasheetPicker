@@ -20,3 +20,10 @@ Author: Guilherme M Bertolino
 | `Ctrl+Z` | Remove the last point from the active graph |
 
 `Ctrl+Z` can be repeated to remove multiple points in reverse order.
+
+## Interpolation
+
+After selecting at least two points in a graph, click `Interpolate`. Enter the
+start value `x0`, the end value `xf`, and the total number of points. The app
+creates a new graph with values interpolated linearly between the selected
+points.

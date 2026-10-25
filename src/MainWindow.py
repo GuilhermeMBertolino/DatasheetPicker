@@ -13,11 +13,12 @@ from PySide6.QtWidgets import (
 )
 
 from AxisPanel import AxisPanel
-from calibration import pixel_to_data_coordinates
+from calibration import data_to_pixel_coordinates, pixel_to_data_coordinates
 from ExportService import ExportService
 from graph_models import DataPoint, GraphCollection
 from GraphView import GraphView
 from PointsPanel import PointsPanel
+from interpolation import interpolate_pixel_curve
 
 
 class MainWindow(QMainWindow):
@@ -75,6 +76,7 @@ class MainWindow(QMainWindow):
         self.reset_view_button = QPushButton("Reset View")
         self.export_active_button = QPushButton("Export Active")
         self.export_all_button = QPushButton("Export All")
+        self.interpolate_button = QPushButton("Interpolate")
         self.magnifier_button = QPushButton("Magnifier")
         self.magnifier_button.setCheckable(True)
         self.magnifier_button.setToolTip("Toggle the magnifier")
@@ -85,6 +87,7 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self.reset_view_button)
         toolbar.addWidget(self.export_active_button)
         toolbar.addWidget(self.export_all_button)
+        toolbar.addWidget(self.interpolate_button)
         toolbar.addWidget(self.magnifier_button)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
         self._create_shortcuts()
@@ -112,6 +115,7 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         self.open_button.clicked.connect(self.open_image)
         self.reset_view_button.clicked.connect(self.reset_view)
+        self.interpolate_button.clicked.connect(self.interpolate_active_graph)
         self.magnifier_button.toggled.connect(
             self.graph_view.set_magnifier_enabled
         )
@@ -170,12 +174,16 @@ class MainWindow(QMainWindow):
         self.graph_view.set_mode(self.mode)
         self.update_calibrated_points()
 
+    def _create_graph(self, name, color):
+        graph = self.graphs.add(name, color)
+        self.graph_view.add_graph(graph.graph_id, graph.color)
+        self.points_panel.add_graph(graph.graph_id, graph.name)
+        return graph
+
     def add_graph(self, _graph_id=None):
         graph_number = len(self.graphs) + 1
         color = self.graph_colors[(graph_number - 1) % len(self.graph_colors)]
-        graph = self.graphs.add(f"Graph {graph_number}", color)
-        self.graph_view.add_graph(graph.graph_id, graph.color)
-        self.points_panel.add_graph(graph.graph_id, graph.name)
+        graph = self._create_graph(f"Graph {graph_number}", color)
         self._activate_graph(graph.graph_id)
         self.start_points_mode()
 
@@ -230,6 +238,115 @@ class MainWindow(QMainWindow):
         graph = self.graphs.get(self.active_graph_id)
         graph.points.append(DataPoint(pixel_x, pixel_y, value_x, value_y))
         self._refresh_graph(graph)
+
+    def interpolate_active_graph(self):
+        if self.active_graph_id is None:
+            return
+
+        source_graph = self.graphs.get(self.active_graph_id)
+        if len(source_graph.points) < 2:
+            QMessageBox.information(
+                self,
+                "Interpolation",
+                "Add at least two points before interpolating.",
+            )
+            return
+
+        first_x = source_graph.points[0].value_x
+        last_x = source_graph.points[-1].value_x
+        x0, accepted = QInputDialog.getDouble(
+            self,
+            "Interpolation",
+            "Start x (x0):",
+            first_x,
+            -1e12,
+            1e12,
+            6,
+        )
+        if not accepted:
+            return
+
+        xf, accepted = QInputDialog.getDouble(
+            self,
+            "Interpolation",
+            "End x (xf):",
+            last_x,
+            -1e12,
+            1e12,
+            6,
+        )
+        if not accepted:
+            return
+
+        total_points, accepted = QInputDialog.getInt(
+            self,
+            "Interpolation",
+            "Total number of points:",
+            100,
+            2,
+            100000,
+            1,
+        )
+        if not accepted:
+            return
+
+        try:
+            pixel_x0, _ = data_to_pixel_coordinates(
+                x0,
+                source_graph.points[0].value_y,
+                self.graph_view.axis_positions,
+                self.axis_panel.get_values(),
+                self.axis_panel.is_x_logarithmic(),
+                self.axis_panel.is_y_logarithmic(),
+            )
+            pixel_xf, _ = data_to_pixel_coordinates(
+                xf,
+                source_graph.points[0].value_y,
+                self.graph_view.axis_positions,
+                self.axis_panel.get_values(),
+                self.axis_panel.is_x_logarithmic(),
+                self.axis_panel.is_y_logarithmic(),
+            )
+            interpolated_pixels = interpolate_pixel_curve(
+                source_graph.points,
+                pixel_x0,
+                pixel_xf,
+                total_points,
+            )
+            interpolated_values = [
+                pixel_to_data_coordinates(
+                    pixel_x,
+                    pixel_y,
+                    self.graph_view.axis_positions,
+                    self.axis_panel.get_values(),
+                    self.axis_panel.is_x_logarithmic(),
+                    self.axis_panel.is_y_logarithmic(),
+                )
+                for pixel_x, pixel_y in interpolated_pixels
+            ]
+        except (KeyError, ValueError) as error:
+            QMessageBox.warning(self, "Interpolation failed", str(error))
+            return
+
+        graph_number = len(self.graphs) + 1
+        color = self.graph_colors[(graph_number - 1) % len(self.graph_colors)]
+        graph = self._create_graph(
+            f"{source_graph.name} Interpolated",
+            color,
+        )
+        self._activate_graph(graph.graph_id)
+
+        for (value_x, value_y), (pixel_x, pixel_y) in zip(
+            interpolated_values,
+            interpolated_pixels,
+        ):
+            graph.points.append(
+                DataPoint(pixel_x, pixel_y, value_x, value_y)
+            )
+            self.graph_view.add_data_point(pixel_x, pixel_y)
+
+        self._refresh_graph(graph)
+        self.start_points_mode()
 
     def undo_last_point(self):
         if self.active_graph_id is None:
