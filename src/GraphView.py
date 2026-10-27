@@ -38,6 +38,8 @@ class GraphView(QGraphicsView):
         self.data_points = []
         self.data_markers = []
         self.data_lines = []
+        self.data_marker_radius = 0.75
+        self.data_line_width = 1
         self.dragging_point_index = None
         self.dragging_axis_name = None
 
@@ -408,6 +410,7 @@ class GraphView(QGraphicsView):
     def _move_axis_marker(self, name, x, y):
         self.set_axis_marker(name, x, y)
         self.axis_moved.emit(name, x, y)
+        self._refresh_magnifier()
 
     def _move_data_point(self, index, x, y):
         self.data_points[index] = (x, y)
@@ -434,7 +437,7 @@ class GraphView(QGraphicsView):
             x2, y2 = self.data_points[index]
             line = QGraphicsLineItem(x1, y1, x2, y2)
             pen = QPen(color)
-            pen.setWidth(2)
+            pen.setWidth(self.data_line_width)
             line.setPen(pen)
             line.setZValue(15)
             self.scene.addItem(line)
@@ -663,7 +666,7 @@ class GraphView(QGraphicsView):
         self.data_points.append((x, y))
 
         color = self.graph_layers[self.active_graph_id]["color"]
-        marker = self._create_data_marker(x, y, color)
+        marker = self._create_data_marker(x, y, color, self.data_marker_radius)
 
         self.scene.addItem(marker)
         marker.setZValue(20)
@@ -676,7 +679,7 @@ class GraphView(QGraphicsView):
             line = QGraphicsLineItem(x1, y1, x, y)
 
             pen = QPen(color)
-            pen.setWidth(2)
+            pen.setWidth(self.data_line_width)
 
             line.setPen(pen)
             line.setZValue(15)
