@@ -18,6 +18,9 @@ Author: Guilherme M Bertolino
 | `Ctrl+Shift+E` | Export all graphs as CSV |
 | `Ctrl+M` | Toggle magnifier |
 | `Ctrl+Z` | Remove the last point from the active graph |
+| `Ctrl+Y` | Restore the last undone point |
+| `Ctrl+W` | Close the application |
+| `Esc` | Close the application |
 
 `Ctrl+Z` can be repeated to remove multiple points in reverse order.
 

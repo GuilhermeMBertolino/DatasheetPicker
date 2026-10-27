@@ -32,6 +32,7 @@ class MainWindow(QMainWindow):
         self.selection_index = 0
         self.mode = "calibration"
         self.graphs = GraphCollection()
+        self.redo_buffers = {}
         self.active_graph_id = None
         self.export_service = ExportService()
         self.graph_colors = [
@@ -48,6 +49,7 @@ class MainWindow(QMainWindow):
         graph = self.graphs.add("Graph 1", self.graph_colors[0])
         self.graph_view.add_graph(graph.graph_id, graph.color)
         self.points_panel.add_graph(graph.graph_id, graph.name, graph.color)
+        self.redo_buffers[graph.graph_id] = []
         self._activate_graph(graph.graph_id)
         self.axis_panel.set_current_selection("X1")
         self.graph_view.start_axis_selection("X1")
@@ -102,6 +104,9 @@ class MainWindow(QMainWindow):
             ("Export All CSV", "Ctrl+Shift+E", self.export_all_csv),
             ("Toggle Magnifier", "Ctrl+M", self.toggle_magnifier),
             ("Undo Last Point", "Ctrl+Z", self.undo_last_point),
+            ("Redo Last Point", "Ctrl+Y", self.redo_last_point),
+            ("Close Window", "Ctrl+W", self.close),
+            ("Close Window", "Escape", self.close),
         )
 
         self.shortcut_actions = []
@@ -184,6 +189,7 @@ class MainWindow(QMainWindow):
         graph = self.graphs.add(name, color)
         self.graph_view.add_graph(graph.graph_id, graph.color)
         self.points_panel.add_graph(graph.graph_id, graph.name, graph.color)
+        self.redo_buffers[graph.graph_id] = []
         return graph
 
     def add_graph(self, _graph_id=None):
@@ -203,6 +209,7 @@ class MainWindow(QMainWindow):
         self.graph_view.remove_graph(graph_id)
         self.points_panel.remove_graph(graph_id)
         self.graphs.remove(graph_id)
+        self.redo_buffers.pop(graph_id, None)
         if was_active:
             self._activate_graph(next(iter(self.graphs)))
 
@@ -255,6 +262,7 @@ class MainWindow(QMainWindow):
         value_x, value_y = self._convert_point(pixel_x, pixel_y)
         graph = self.graphs.get(self.active_graph_id)
         graph.points.append(DataPoint(pixel_x, pixel_y, value_x, value_y))
+        self.redo_buffers[self.active_graph_id].clear()
         self._refresh_graph(graph)
 
     def move_point(self, index, pixel_x, pixel_y):
@@ -271,6 +279,7 @@ class MainWindow(QMainWindow):
         point.pixel_y = pixel_y
         point.value_x = value_x
         point.value_y = value_y
+        self.redo_buffers[self.active_graph_id].clear()
         self.points_panel.update_point(
             graph.graph_id,
             index,
@@ -286,7 +295,8 @@ class MainWindow(QMainWindow):
         if index < 0 or index >= len(graph.points):
             return
 
-        graph.points.pop(index)
+        removed_point = graph.points.pop(index)
+        self.redo_buffers[graph_id].clear()
         previous_graph_id = self.active_graph_id
         if graph_id != previous_graph_id:
             self.graph_view.set_active_graph(graph_id)
@@ -305,6 +315,7 @@ class MainWindow(QMainWindow):
             return
 
         graph.points[:] = [graph.points[index] for index in order]
+        self.redo_buffers[graph_id].clear()
         previous_graph_id = self.active_graph_id
         if graph_id != previous_graph_id:
             self.graph_view.set_active_graph(graph_id)
@@ -431,8 +442,31 @@ class MainWindow(QMainWindow):
         if not graph.points:
             return
 
+        point_index = len(graph.points) - 1
+        removed_point = graph.points[point_index]
         if self.graph_view.remove_last_data_point():
             graph.points.pop()
+            self.redo_buffers[self.active_graph_id].append(
+                (point_index, removed_point)
+            )
+            self._refresh_graph(graph)
+
+    def redo_last_point(self):
+        if self.active_graph_id is None:
+            return
+
+        buffer = self.redo_buffers[self.active_graph_id]
+        if not buffer:
+            return
+
+        point_index, point = buffer.pop()
+        graph = self.graphs.get(self.active_graph_id)
+        if self.graph_view.insert_data_point(
+            point_index,
+            point.pixel_x,
+            point.pixel_y,
+        ):
+            graph.points.insert(point_index, point)
             self._refresh_graph(graph)
 
     def _convert_point(self, pixel_x, pixel_y):
@@ -469,6 +503,7 @@ class MainWindow(QMainWindow):
         self.graph_view.reset_all_data_points()
         for graph in self.graphs.values():
             graph.points.clear()
+            self.redo_buffers[graph.graph_id].clear()
             self._refresh_graph(graph)
         self.axis_panel.set_calibration_reset()
         self.axis_panel.set_current_selection("X1")
@@ -486,6 +521,7 @@ class MainWindow(QMainWindow):
             return
         for graph in self.graphs.values():
             graph.points.clear()
+            self.redo_buffers[graph.graph_id].clear()
             self._refresh_graph(graph)
 
     def reset_view(self):

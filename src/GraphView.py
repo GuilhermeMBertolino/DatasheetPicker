@@ -557,6 +557,25 @@ class GraphView(QGraphicsView):
 
         return True
 
+    def insert_data_point(self, index, x, y):
+        if index < 0 or index > len(self.data_points):
+            return False
+
+        self.data_points.insert(index, (x, y))
+        color = self.graph_layers[self.active_graph_id]["color"]
+        marker = self._create_data_marker(
+            x,
+            y,
+            color,
+            self.data_marker_radius,
+        )
+        self.scene.addItem(marker)
+        marker.setZValue(20)
+        self.data_markers.insert(index, marker)
+        self._rebuild_data_lines()
+        self._refresh_magnifier()
+        return True
+
     def remove_data_point(self, index):
         if index < 0 or index >= len(self.data_points):
             return False
